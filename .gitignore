@@ -4,3 +4,10 @@ rankings/*.xlsx
 for_siwi_*.csv
 race_info_*.xlsx
 __pycache__
+uv.lock
+*.pyc
+*.pyo
+.vscode/
+.venv/
+
+

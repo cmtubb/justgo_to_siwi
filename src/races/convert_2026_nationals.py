@@ -4,13 +4,9 @@ import sys
 from pathlib import Path
 import argparse
 
-script_dir = Path(__file__).resolve().parent
-
-jg_to_siwi = script_dir.parent / "justgo_to_siwi"
-
-if jg_to_siwi not in sys.path:
-    sys.path.append(str(jg_to_siwi))
 from justgo_to_siwi import JustGoToSiwi
+
+script_dir = Path(__file__).resolve().parent
 
 rankings_dir = (script_dir / ".." / ".." / "rankings").resolve()
 

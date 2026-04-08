@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kayak-events"
+version = "0.1.0"
+description = "Scripts for converting kayak event data and generating rankings"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas",
+  "selenium",
+  "beautifulsoup4",
+  "html5lib",
+  "openpyxl",
+  "ipython",
+  "matplotlib"
+]
+
+[tool.hatch.build]
+sources = ["src"]
+
+[tool.hatch.build.targets.wheel]
+# Hatch's wheel builder expects package paths relative to the project root.
+# Our importable package lives under `src/`.
+packages = ["src/justgo_to_siwi"]
+
