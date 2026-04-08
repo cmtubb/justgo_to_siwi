@@ -3,3 +3,4 @@ data/
 rankings/*.xlsx
 for_siwi_*.csv
 race_info_*.xlsx
+__pycache__
