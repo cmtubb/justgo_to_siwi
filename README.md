@@ -22,8 +22,14 @@ events/
 │   ├── justgo_to_siwi/    # Core conversion library
 │   ├── races/             # Per-event conversion scripts
 │   └── tools/             # Utilities (ranking fetcher, filename helper)
+├── web/                   # Browser version of the converter (no install needed)
 └── pyproject.toml
 ```
+
+## Two ways to use it
+
+- **[Web app](web/)** (`web/`) — a static, browser-based version of the converter for non-technical users. No install, nothing is uploaded (all processing happens locally in the browser), and it can be hosted on GitHub Pages. See [`web/README.md`](web/README.md).
+- **Python scripts** (`src/`) — the original CLI workflow, and the only way to run the ICF rankings scraper. Documented below.
 
 ## Setup
 
