@@ -9,5 +9,6 @@ uv.lock
 *.pyo
 .vscode/
 .venv/
+.claude/settings.local.json
 
 
