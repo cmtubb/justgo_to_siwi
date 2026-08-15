@@ -99,6 +99,22 @@ function cmpStr(a: string, b: string): number {
 }
 
 /**
+ * Descending numeric comparison for Ranking. Python's Ranking column is read
+ * back from Excel as int64 (pandas infers the numeric type), so it sorts
+ * numerically rather than lexicographically. Unranked (empty) entries sort
+ * before all ranked ones (and so get the highest bibs, tie-broken by age),
+ * regardless of comparison order.
+ */
+function cmpRankingDesc(a: string, b: string): number {
+  const av = a === "" ? null : Number(a);
+  const bv = b === "" ? null : Number(b);
+  if (av === null && bv === null) return 0;
+  if (av === null) return -1;
+  if (bv === null) return 1;
+  return bv - av;
+}
+
+/**
  * Port of `JustGoToSiwi.calculate`. Produces the Summary table and the
  * ranked/bibbed "for Siwi" table from parsed JustGo rows.
  */
@@ -185,14 +201,14 @@ export function convert(input: ConvertInput): ConvertResult {
     );
   }
 
-  // Sort: Class descending, Ranking descending (as strings, matching the Python),
+  // Sort: Class descending, Ranking descending (numeric; unranked last),
   // Age ascending; original order breaks ties for stability.
   const hasAge = internalNames.includes("Age");
   const indexed = siwi.map((r, i) => ({ r, i }));
   indexed.sort((a, b) => {
     const byClass = cmpStr(b.r.Class, a.r.Class);
     if (byClass !== 0) return byClass;
-    const byRanking = cmpStr(b.r.Ranking ?? "", a.r.Ranking ?? "");
+    const byRanking = cmpRankingDesc(a.r.Ranking ?? "", b.r.Ranking ?? "");
     if (byRanking !== 0) return byRanking;
     if (hasAge) {
       const ageDiff = Number(a.r.Age) - Number(b.r.Age);

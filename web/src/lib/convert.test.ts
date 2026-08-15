@@ -123,7 +123,7 @@ describe("convert (targeted behaviour)", () => {
     expect(sam?.Region).toBe("New South Wales");
   });
 
-  it("ranks by ranking (as strings) then age, and assigns descending bibs", () => {
+  it("ranks by ranking (numerically) then age, and assigns descending bibs", () => {
     const rankings: Rankings = {
       K1M: [
         { name: "JONES Sam", ranking: "10" },
@@ -131,10 +131,31 @@ describe("convert (targeted behaviour)", () => {
       ],
     };
     const result = convert({ rows, columns, events, rankings });
-    // "2" sorts after "10" descending (string order), so Alex (rank "2") is first.
-    expect(result.forSiwi.map((r) => r.FirstName)).toEqual(["Alex", "Sam"]);
+    // Numeric order: 10 sorts before 2 descending, so Sam (rank 10) is first.
+    expect(result.forSiwi.map((r) => r.FirstName)).toEqual(["Sam", "Alex"]);
     expect(result.forSiwi.map((r) => r.Bib)).toEqual(["2", "1"]);
-    expect(result.forSiwi.map((r) => r.Ranking)).toEqual(["2", "10"]);
+    expect(result.forSiwi.map((r) => r.Ranking)).toEqual(["10", "2"]);
+  });
+
+  it("sorts unranked entries before ranked ones, giving them the highest bibs", () => {
+    const rankings: Rankings = {
+      K1M: [{ name: "SMITH Alex", ranking: "5" }],
+    };
+    const result = convert({ rows, columns, events, rankings });
+    // Sam has no ranking entry, so gets the highest bib ahead of ranked Alex.
+    expect(result.forSiwi.map((r) => r.FirstName)).toEqual(["Sam", "Alex"]);
+    expect(result.forSiwi.map((r) => r.Ranking)).toEqual(["", "5"]);
+    expect(result.forSiwi.map((r) => r.Bib)).toEqual(["2", "1"]);
+  });
+
+  it("orders multiple unranked entries by age, youngest getting the highest bib", () => {
+    const unrankedRows: Row[] = [
+      { ...rows[0], FirstName: "Older", Age: "30" },
+      { ...rows[1], FirstName: "Younger", Age: "20" },
+    ];
+    const result = convert({ rows: unrankedRows, columns, events });
+    expect(result.forSiwi.map((r) => r.FirstName)).toEqual(["Younger", "Older"]);
+    expect(result.forSiwi.map((r) => r.Bib)).toEqual(["2", "1"]);
   });
 
   it("warns when a class has more entrants than bibs", () => {
