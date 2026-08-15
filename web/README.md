@@ -18,8 +18,8 @@ Once deployed to GitHub Pages, open the published URL and follow the steps:
    club-acronym guessing as the Python script.
 3. **Define classes & bib ranges** — one row per Siwi class, with the text to
    search for in each athlete's Classes field and the bib number range.
-4. **Rankings (optional)** — upload the ICF rankings workbook (as produced by
-   `src/tools/get_icf_rankings.py`) to seed bibs by ranking.
+4. **Rankings (optional)** — pick a built-in ICF world ranking release to seed
+   bibs by ranking, or leave it on "None" to order bibs by age only.
 5. **Generate** — preview the results and download `for_siwi_*.csv` and
    `race_info_*.xlsx`.
 
@@ -68,9 +68,10 @@ public/rankings/2026-2.json   { release, crossRelease, scrapedAt, classes }
 `src/tools/get_icf_rankings.py` regenerates these. It scrapes Siwi over plain
 HTTP (no browser or driver), collects every release from 2026-1 onwards, and
 skips releases that Siwi lists but hasn't published results for yet. Because the
-files ship with the site, they're served as static assets alongside the app.
+files ship with the site, they're fetched as static assets alongside the app —
+Step 4 lists them in a dropdown, defaulting to the newest.
 
-The app still takes rankings as an optional `.xlsx` **upload**. Wiring it up to
-select a built-in release instead is the next step; the entries have the same
-`name`/`ranking` shape either way, so the converter needs no rework. After that,
-a scheduled GitHub Action can re-run the scraper and commit refreshed JSON.
+The Python race scripts haven't moved to the JSON format yet, so
+`get_icf_rankings.py --xlsx DIR` still writes the newest release as the legacy
+workbook they read. Once they're switched over, a scheduled GitHub Action can
+re-run the scraper and commit refreshed JSON automatically.

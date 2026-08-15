@@ -1,6 +1,17 @@
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import type { ConvertResult, Rankings, RankingEntry, Row } from "./types";
+import type {
+  ConvertResult,
+  Rankings,
+  RankingEntry,
+  RankingIndex,
+  Row,
+} from "./types";
+
+// BASE_URL always has a trailing slash, and honours Vite's `base` config
+// (relative in production, so this still works from a GitHub Pages project
+// subpath), so built-in rankings are fetched from alongside the app itself.
+const RANKINGS_BASE = `${import.meta.env.BASE_URL}rankings/`;
 
 export interface ParsedCsv {
   headers: string[];
@@ -28,27 +39,30 @@ export function parseCsv(file: File): Promise<ParsedCsv> {
   });
 }
 
+/** List the built-in ranking releases available alongside the app, newest first. */
+export async function fetchRankingIndex(): Promise<RankingIndex> {
+  const res = await fetch(`${RANKINGS_BASE}index.json`);
+  if (!res.ok) throw new Error(`Could not load ${RANKINGS_BASE}index.json (HTTP ${res.status})`);
+  return (await res.json()) as RankingIndex;
+}
+
 /**
- * Read an ICF rankings workbook: one sheet per class code, with `name` and
- * `ranking` columns (the format produced by `get_icf_rankings.py`).
+ * Fetch one built-in ranking release (as named by a `RankingReleaseInfo.file`
+ * from `fetchRankingIndex`) and reshape it into `Rankings`.
  */
-export async function parseRankings(file: File): Promise<Rankings> {
-  const buffer = await file.arrayBuffer();
-  const wb = XLSX.read(buffer, { type: "array" });
+export async function fetchRankingRelease(file: string): Promise<Rankings> {
+  const res = await fetch(`${RANKINGS_BASE}${file}`);
+  if (!res.ok) throw new Error(`Could not load ${RANKINGS_BASE}${file} (HTTP ${res.status})`);
+  const doc = (await res.json()) as {
+    classes: Record<string, { name: string; ranking: number | string }[]>;
+  };
+
   const rankings: Rankings = {};
-
-  for (const sheetName of wb.SheetNames) {
-    const sheet = wb.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-      defval: "",
-    });
-    const entries: RankingEntry[] = json.map((r) => ({
-      name: String(r.name ?? ""),
-      ranking: String(r.ranking ?? ""),
-    }));
-    rankings[sheetName] = entries;
+  for (const [cls, entries] of Object.entries(doc.classes)) {
+    rankings[cls] = entries.map(
+      (e): RankingEntry => ({ name: e.name, ranking: String(e.ranking) }),
+    );
   }
-
   return rankings;
 }
 

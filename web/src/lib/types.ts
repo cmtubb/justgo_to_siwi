@@ -20,6 +20,18 @@ export interface RankingEntry {
 /** Class code -> ranking rows (from the ICF rankings workbook). */
 export type Rankings = Record<string, RankingEntry[]>;
 
+/** One entry in the built-in rankings' index.json (newest release first). */
+export interface RankingReleaseInfo {
+  id: string;
+  file: string;
+  counts: Record<string, number>;
+}
+
+export interface RankingIndex {
+  generatedAt: string;
+  releases: RankingReleaseInfo[];
+}
+
 /** Force a DOB for an athlete matched by surname (replaces hardcoded fixes). */
 export interface DobOverride {
   lastName: string;

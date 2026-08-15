@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/components/columnmapper.tsx","./src/components/eventeditor.tsx","./src/components/resultview.tsx","./src/lib/convert.test.ts","./src/lib/convert.ts","./src/lib/io.ts","./src/lib/types.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/columnmapper.tsx","./src/components/eventeditor.tsx","./src/components/resultview.tsx","./src/lib/convert.test.ts","./src/lib/convert.ts","./src/lib/io.test.ts","./src/lib/io.ts","./src/lib/types.ts"],"version":"5.9.3"}

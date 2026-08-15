@@ -7,16 +7,20 @@ import { convert } from "./lib/convert";
 import {
   downloadForSiwiCsv,
   downloadRaceInfoXlsx,
+  fetchRankingIndex,
+  fetchRankingRelease,
   parseCsv,
-  parseRankings,
   type ParsedCsv,
 } from "./lib/io";
 import type {
   ColumnMapping,
   ConvertResult,
   EventClass,
+  RankingIndex,
   Rankings,
 } from "./lib/types";
+
+type RankingSource = "none" | "builtin";
 
 const DEFAULT_MAPPINGS: Mapping[] = [
   { internal: "Age", header: "" },
@@ -61,7 +65,11 @@ export default function App() {
   const [mappings, setMappings] = useState<Mapping[]>(DEFAULT_MAPPINGS);
   const [events, setEvents] = useState<EventClass[]>(DEFAULT_EVENTS);
   const [rankings, setRankings] = useState<Rankings | null>(null);
-  const [rankingsName, setRankingsName] = useState("");
+  const [rankingSource, setRankingSource] = useState<RankingSource>("none");
+  const [rankingIndex, setRankingIndex] = useState<RankingIndex | null>(null);
+  const [rankingIndexLoading, setRankingIndexLoading] = useState(false);
+  const [selectedRelease, setSelectedRelease] = useState<string | null>(null);
+  const [releaseLoading, setReleaseLoading] = useState(false);
   const [ident, setIdent] = useState("event");
   const [result, setResult] = useState<ConvertResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -79,16 +87,49 @@ export default function App() {
     }
   };
 
-  const onRankings = async (file: File | undefined) => {
-    if (!file) return;
+  const loadRelease = async (index: RankingIndex, releaseId: string) => {
+    const info = index.releases.find((r) => r.id === releaseId);
+    if (!info) return;
+    setReleaseLoading(true);
     setError(null);
     try {
-      const parsed = await parseRankings(file);
+      const parsed = await fetchRankingRelease(info.file);
       setRankings(parsed);
-      setRankingsName(file.name);
+      setSelectedRelease(releaseId);
     } catch (e) {
-      setError(`Could not read rankings workbook: ${String(e)}`);
+      setError(`Could not load ranking release: ${String(e)}`);
+    } finally {
+      setReleaseLoading(false);
     }
+  };
+
+  const selectRankingSource = async (next: RankingSource) => {
+    setRankingSource(next);
+    setError(null);
+    setRankings(null);
+    if (next !== "builtin") return;
+
+    if (rankingIndex) {
+      const releaseId = selectedRelease ?? rankingIndex.releases[0]?.id;
+      if (releaseId) await loadRelease(rankingIndex, releaseId);
+      return;
+    }
+
+    setRankingIndexLoading(true);
+    try {
+      const index = await fetchRankingIndex();
+      setRankingIndex(index);
+      const releaseId = index.releases[0]?.id;
+      if (releaseId) await loadRelease(index, releaseId);
+    } catch (e) {
+      setError(`Could not load ranking releases: ${String(e)}`);
+    } finally {
+      setRankingIndexLoading(false);
+    }
+  };
+
+  const onSelectRelease = (releaseId: string) => {
+    if (rankingIndex) loadRelease(rankingIndex, releaseId);
   };
 
   const columns: ColumnMapping = useMemo(() => {
@@ -174,25 +215,56 @@ export default function App() {
 
       <Step num={4} title="Rankings (optional)" disabled={!csv}>
         <p className="hint">
-          Upload the ICF rankings workbook (one sheet per class, with{" "}
-          <code>name</code> and <code>ranking</code> columns) to seed bibs by
-          ranking. Skip this to order bibs by age only.
+          Seed bib numbers from an ICF world ranking release. Skip this to
+          order bibs by age only.
         </p>
-        <input
-          className="file-input"
-          type="file"
-          accept=".xlsx,.xls"
-          onChange={(e) => onRankings(e.target.files?.[0])}
-        />
-        {rankings && (
-          <p className="hint">
-            Loaded <strong>{rankingsName}</strong> —{" "}
-            {Object.keys(rankings).map((c) => (
-              <span className="tag" key={c}>
-                {c}
-              </span>
-            ))}
-          </p>
+        <div className="tabs">
+          <button
+            type="button"
+            className={rankingSource === "none" ? "active" : ""}
+            onClick={() => selectRankingSource("none")}
+          >
+            None
+          </button>
+          <button
+            type="button"
+            className={rankingSource === "builtin" ? "active" : ""}
+            onClick={() => selectRankingSource("builtin")}
+          >
+            ICF Rankings
+          </button>
+        </div>
+
+        {rankingSource === "builtin" && (
+          <div>
+            {rankingIndexLoading && <p className="hint">Loading available releases…</p>}
+            {rankingIndex && (
+              <label>
+                Release:{" "}
+                <select
+                  value={selectedRelease ?? ""}
+                  onChange={(e) => onSelectRelease(e.target.value)}
+                >
+                  {rankingIndex.releases.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {releaseLoading && <p className="hint">Loading {selectedRelease}…</p>}
+            {rankings && !releaseLoading && (
+              <p className="hint">
+                Using release <strong>{selectedRelease}</strong> —{" "}
+                {Object.keys(rankings).map((c) => (
+                  <span className="tag" key={c}>
+                    {c}
+                  </span>
+                ))}
+              </p>
+            )}
+          </div>
         )}
       </Step>
 
