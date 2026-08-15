@@ -99,6 +99,8 @@ export default function App() {
     return out;
   }, [mappings]);
 
+  const outputIdent = ident.trim() || "event";
+
   const readyEvents = useMemo(
     () => events.filter((e) => e.code.trim() && e.search.trim()),
     [events],
@@ -198,10 +200,7 @@ export default function App() {
         <div className="row">
           <label>
             Output name:{" "}
-            <input
-              value={ident}
-              onChange={(e) => setIdent(e.target.value || "event")}
-            />
+            <input value={ident} onChange={(e) => setIdent(e.target.value)} />
           </label>
           <button className="primary" disabled={!canConvert} onClick={runConvert}>
             Convert
@@ -217,8 +216,8 @@ export default function App() {
           <div style={{ marginTop: "1rem" }}>
             <ResultView
               result={result}
-              onDownloadCsv={() => downloadForSiwiCsv(result, ident)}
-              onDownloadXlsx={() => downloadRaceInfoXlsx(result, ident)}
+              onDownloadCsv={() => downloadForSiwiCsv(result, outputIdent)}
+              onDownloadXlsx={() => downloadRaceInfoXlsx(result, outputIdent)}
             />
           </div>
         )}
