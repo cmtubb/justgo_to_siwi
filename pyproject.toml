@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 license = "MIT"
 dependencies = [
   "pandas",
-  "selenium",
+  "requests",
   "beautifulsoup4",
   "html5lib",
   "openpyxl",

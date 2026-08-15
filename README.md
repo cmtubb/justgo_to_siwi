@@ -61,16 +61,29 @@ Or run commands through uv without activating:
 uv run python src/races/convert_2026_nationals.py --example
 ```
 
-`get_icf_rankings.py` also needs [Firefox](https://www.mozilla.org/firefox/) and [geckodriver](https://github.com/mozilla/geckodriver) for Selenium.
+`get_icf_rankings.py` talks to Siwi over plain HTTP, so it needs no browser or
+driver.
 
 ## Basic usage
 
 ### 1. Fetch ICF rankings (optional, but needed for ranked bib assignment)
 
-Downloads current rankings from Siwi and saves a timestamped Excel file to `rankings/`:
+Downloads every published ranking release from 2026-1 onwards and writes one
+JSON file per release (plus an `index.json`) into `web/public/rankings/`, where
+the web app reads them:
 
 ```bash
 python src/tools/get_icf_rankings.py
+```
+
+Releases that Siwi lists but hasn't published results for yet are skipped, so
+re-running mid-year simply picks up each new release as it appears.
+
+The Python race scripts still read the older Excel format. Until they move over
+to the JSON, `--xlsx` also writes the newest release as a workbook:
+
+```bash
+python src/tools/get_icf_rankings.py --xlsx rankings/
 ```
 
 Point your event script at the new file (see `rankings=` in the race scripts).

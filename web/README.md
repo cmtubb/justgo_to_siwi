@@ -57,8 +57,20 @@ from a domain root or a project subpath like `https://<user>.github.io/<repo>/`.
 
 ## Rankings — current and future
 
-Today rankings are an optional **upload** (the `.xlsx` from
-`get_icf_rankings.py`). Because that scraper drives a real browser via Selenium,
-it can't run inside a static page. The planned next step is a scheduled GitHub
-Action that runs the scraper, commits `rankings/latest.json`, and has the app
-fetch it automatically — same data shape, so no rework of the converter.
+Ranking data is committed to the repo as JSON under `public/rankings/`, one file
+per ICF release plus an `index.json` listing what's available:
+
+```
+public/rankings/index.json    releases, newest first, with per-class counts
+public/rankings/2026-2.json   { release, crossRelease, scrapedAt, classes }
+```
+
+`src/tools/get_icf_rankings.py` regenerates these. It scrapes Siwi over plain
+HTTP (no browser or driver), collects every release from 2026-1 onwards, and
+skips releases that Siwi lists but hasn't published results for yet. Because the
+files ship with the site, they're served as static assets alongside the app.
+
+The app still takes rankings as an optional `.xlsx` **upload**. Wiring it up to
+select a built-in release instead is the next step; the entries have the same
+`name`/`ranking` shape either way, so the converter needs no rework. After that,
+a scheduled GitHub Action can re-run the scraper and commit refreshed JSON.
