@@ -71,7 +71,7 @@ skips releases that Siwi lists but hasn't published results for yet. Because the
 files ship with the site, they're fetched as static assets alongside the app —
 Step 4 lists them in a dropdown, defaulting to the newest.
 
-The Python race scripts haven't moved to the JSON format yet, so
-`get_icf_rankings.py --xlsx DIR` still writes the newest release as the legacy
-workbook they read. Once they're switched over, a scheduled GitHub Action can
-re-run the scraper and commit refreshed JSON automatically.
+The Python race scripts (`src/justgo_to_siwi/justgo_to_siwi.py`) also read
+these same release files directly now, so the web app and the CLI workflow
+share one ranking source. Next step: a scheduled GitHub Action to re-run the
+scraper and commit refreshed JSON automatically.

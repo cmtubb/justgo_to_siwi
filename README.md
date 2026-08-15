@@ -7,7 +7,7 @@ Scripts for converting Australian canoe slalom event registrations from [JustGo]
 1. Reads a JustGo attendee CSV export for an event.
 2. Normalises columns (names, clubs, regions, event classes).
 3. Splits athletes into Siwi classes (K1M, C1M, K1W, C1W, MCSLX, WCSLX, etc.).
-4. Looks up each athlete's ICF ranking from a local Excel file.
+4. Looks up each athlete's ICF ranking from a committed JSON ranking release.
 5. Assigns bib numbers by ranking (highest-ranked paddler gets the highest bib in each class range).
 6. Writes output files ready to import into Siwi.
 
@@ -16,13 +16,13 @@ Scripts for converting Australian canoe slalom event registrations from [JustGo]
 ```
 events/
 ├── examples/              # Sample JustGo CSVs for testing (--example mode)
-├── rankings/              # ICF ranking Excel files (one sheet per class)
 ├── data/                  # Event-specific input data (gitignored)
 ├── src/
 │   ├── justgo_to_siwi/    # Core conversion library
 │   ├── races/             # Per-event conversion scripts
 │   └── tools/             # Utilities (ranking fetcher, filename helper)
 ├── web/                   # Browser version of the converter (no install needed)
+│   └── public/rankings/   # ICF ranking releases (JSON), shared by the web app and race scripts
 └── pyproject.toml
 ```
 
@@ -79,14 +79,8 @@ python src/tools/get_icf_rankings.py
 Releases that Siwi lists but hasn't published results for yet are skipped, so
 re-running mid-year simply picks up each new release as it appears.
 
-The Python race scripts still read the older Excel format. Until they move over
-to the JSON, `--xlsx` also writes the newest release as a workbook:
-
-```bash
-python src/tools/get_icf_rankings.py --xlsx rankings/
-```
-
-Point your event script at the new file (see `rankings=` in the race scripts).
+Both the web app and the race scripts read these same JSON files — point your
+event script at the release you want (see `rankings=` in the race scripts).
 
 ### 2. Prepare event data
 
@@ -130,7 +124,7 @@ Create a new script in `src/races/` following an existing one. You need to confi
 - **`columns`** — maps internal field names to JustGo CSV column headers
 - **`events`** — maps Siwi class codes to `(search_string, (bib_start, bib_end))` tuples; the search string is matched against the classes column
 - **`datadir` / `infile`** — where the input CSV lives
-- **`rankings`** — path to the ICF rankings Excel file
+- **`rankings`** — path to an ICF ranking release JSON file (see `web/public/rankings/`)
 
 Then instantiate `JustGoToSiwi` and call `calculate()`:
 

@@ -1,5 +1,6 @@
 import re
 import copy
+import json
 import time
 import pandas as pd
 
@@ -14,6 +15,9 @@ class JustGoToSiwi():
                  events : dict[str, tuple[str, tuple[int,int]]],
                  columns : dict[str,str],
                  rankings : Path | str):
+        """`rankings` is a path to one release JSON file from
+        `web/public/rankings/` (e.g. `.../2026-2.json`), as produced by
+        `src/tools/get_icf_rankings.py`."""
         self.input = (Path(datadir) / infile).resolve()
 
 
@@ -109,33 +113,55 @@ class JustGoToSiwi():
         df_siwi = pd.concat( class_df, axis=0)
         df_siwi.reset_index(drop=True, inplace=True)
 
-        rankings = {key: None for key in self.events.keys()}
-        for cl in rankings.keys():
-            rankings[cl] = pd.read_excel(self.rankings,
-                                        cl, keep_default_na=False)
+        with open(self.rankings, encoding="utf-8") as f:
+            release = json.load(f)
+
+        rankings = {}
+        for cl in self.events.keys():
+            entries = release["classes"].get(cl)
+            if entries is None:
+                raise KeyError(f"No ranking data for class '{cl}' in {self.rankings}")
+            rankings[cl] = pd.DataFrame(entries, columns=["name", "ranking"])
 
         df_siwi_ranking = copy.deepcopy(df_siwi)
-        siwi_rankings = []
+        siwi_ranking = []
+        siwi_is_ranked = []
+        siwi_ranking_value = []
         for index, athlete in df_siwi.iterrows():
             name = f"{athlete['LastName']} {athlete['FirstName']}"
             cl = athlete['Class']
 
             if name == "O'CALLAGHAN Georgie":
                 name = "O'CALLAGHAN Georgia"
-            
+
             selected = rankings[cl]['name'].str.contains(name)
 
             if selected.any():
-                rankname = rankings[cl].loc[selected, 'name'].iloc[0]
-                ranking = rankings[cl].loc[selected, 'ranking'].iloc[0]
+                ranking = int(rankings[cl].loc[selected, 'ranking'].iloc[0])
+                siwi_ranking.append(ranking)
+                siwi_is_ranked.append(True)
+                siwi_ranking_value.append(ranking)
             else:
-                ranking = ""
+                siwi_ranking.append("")
+                siwi_is_ranked.append(False)
+                # Placeholder: only compared within the unranked group, where
+                # every row shares it, so it never affects ordering there.
+                siwi_ranking_value.append(0)
 
-            siwi_rankings.append(ranking)
+        df_siwi_ranking['Ranking'] = siwi_ranking
 
-        df_siwi_ranking['Ranking'] = siwi_rankings
-        df_siwi_ranking = df_siwi_ranking.sort_values(['Class', 'Ranking', 'Age'], ascending=[False,False, True])
-        df_siwi_ranking = df_siwi_ranking.drop('Age', axis=1)
+        # Sort unranked entries before ranked ones (they get the highest
+        # bibs), then ranked entries by ranking value descending; Age breaks
+        # ties in both groups. Sorting on explicit `_is_ranked`/`_ranking_value`
+        # columns avoids mixing int and "" in one column, which pandas
+        # compares unpredictably.
+        df_siwi_ranking['_is_ranked'] = siwi_is_ranked
+        df_siwi_ranking['_ranking_value'] = siwi_ranking_value
+        df_siwi_ranking = df_siwi_ranking.sort_values(
+            ['Class', '_is_ranked', '_ranking_value', 'Age'],
+            ascending=[False, True, False, True],
+        )
+        df_siwi_ranking = df_siwi_ranking.drop(columns=['Age', '_is_ranked', '_ranking_value'])
         df_siwi_ranking.reset_index(drop=True, inplace=True)
 
         df_siwi_ranking["Bib"] = 0

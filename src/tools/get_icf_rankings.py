@@ -174,16 +174,6 @@ def scrape_release(
     return classes
 
 
-def write_legacy_xlsx(classes: dict[str, list[dict]], path: Path) -> None:
-    """Write the old one-sheet-per-class workbook the Python scripts still read."""
-    import pandas as pd
-
-    with pd.ExcelWriter(path) as writer:
-        for cls, entries in classes.items():
-            frame = pd.DataFrame(entries, columns=["name", "ranking"])
-            frame.to_excel(writer, sheet_name=cls, index=False)
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -191,13 +181,6 @@ def main() -> int:
         type=Path,
         default=default_out,
         help=f"Directory for the JSON files (default: {default_out})",
-    )
-    parser.add_argument(
-        "--xlsx",
-        type=Path,
-        metavar="DIR",
-        help="Also write the legacy workbook for the newest release into DIR "
-        "(transitional, for the Python race scripts)",
     )
     args = parser.parse_args()
 
@@ -265,14 +248,6 @@ def main() -> int:
     )
 
     print(f"\nWrote {len(index)} release(s) to {args.out}")
-
-    if args.xlsx:
-        newest = index[0]["id"]
-        args.xlsx.mkdir(parents=True, exist_ok=True)
-        target = args.xlsx / f"icf_rankings_{newest}.xlsx"
-        document = json.loads((args.out / f"{newest}.json").read_text(encoding="utf-8"))
-        write_legacy_xlsx(document["classes"], target)
-        print(f"Wrote legacy workbook {target}")
 
     return 0
 

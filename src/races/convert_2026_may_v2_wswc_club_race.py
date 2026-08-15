@@ -5,7 +5,7 @@ from justgo_to_siwi import JustGoToSiwi
 
 script_dir = Path(__file__).resolve().parent
 
-rankings_dir = (script_dir / ".." / ".." / "rankings").resolve()
+rankings_dir = (script_dir / ".." / ".." / "web" / "public" / "rankings").resolve()
 
 columns= {"Age": 'Age on Event Start Date',
           'Classes' : "Slalom Entry  - Club:Class",
@@ -25,6 +25,6 @@ jgs = JustGoToSiwi(datadir,
                    "2026_may_v2_wswc_club_race",
                    events,
                    columns,
-                   rankings_dir / "icf_rankings_2026-04-03_1614.xlsx")
+                   rankings_dir / "2026-1.json")
 
 df,df_r,df_siwi = jgs.calculate()

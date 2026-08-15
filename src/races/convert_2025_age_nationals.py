@@ -8,7 +8,7 @@ from justgo_to_siwi import JustGoToSiwi
 
 script_dir = Path(__file__).resolve().parent
 
-rankings_dir = (script_dir / ".." / ".." / "rankings").resolve()
+rankings_dir = (script_dir / ".." / ".." / "web" / "public" / "rankings").resolve()
 
 columns = {"Age"   : 'Age on Event Start Date',
            "Classes": "2026 Canoe Slalom Age Nats - Rescheduled - NGB:Events Entered",
@@ -16,7 +16,7 @@ columns = {"Age"   : 'Age on Event Start Date',
            "School" :"2026 Canoe Slalom Age Nats - Rescheduled - NGB:Paddler's School they are representing (if applica"}
 
 infile="Attendees_2026_Paddle_Australia_Canoe_Slalom_Age_Nationals_Rescheduled.csv"
-rankings = rankings_dir / "icf_rankings_2026-04-03_1614.xlsx"
+rankings = rankings_dir / "2026-1.json"
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--example', action="store_true", help="Use the example file")
