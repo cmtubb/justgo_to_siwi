@@ -7,6 +7,7 @@ name = "kayak-events"
 version = "0.1.0"
 description = "Scripts for converting kayak event data and generating rankings"
 requires-python = ">=3.10"
+license = "MIT"
 dependencies = [
   "pandas",
   "selenium",

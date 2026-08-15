@@ -45,10 +45,12 @@ implementations stay in sync.
 
 ## Deployment
 
-Pushing changes under `web/` to the `main` branch triggers
-`.github/workflows/deploy-pages.yml`, which builds the app and publishes it to
-GitHub Pages. Enable Pages for the repo (Settings → Pages → Source: GitHub
-Actions) once, and every push deploys the latest version.
+`.github/workflows/deploy-pages.yml` builds the app and publishes it to
+GitHub Pages. It's manually triggered (Actions → Deploy web app to GitHub
+Pages → Run workflow) rather than running on every push, so changes under
+`web/` land on `main` without deploying automatically. Enable Pages for the
+repo (Settings → Pages → Source: GitHub Actions) once, then run the workflow
+whenever you want to publish the latest version.
 
 The Vite `base` is set to `./` (relative), so the app works whether it's served
 from a domain root or a project subpath like `https://<user>.github.io/<repo>/`.
