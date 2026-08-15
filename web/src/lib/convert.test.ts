@@ -163,4 +163,15 @@ describe("convert (targeted behaviour)", () => {
     const result = convert({ rows, columns, events: tight });
     expect(result.warnings.some((w) => w.includes("Not enough bibs"))).toBe(true);
   });
+
+  it("warns when Age isn't mapped, since ties then keep CSV row order instead of age order", () => {
+    const noAgeColumns: ColumnMapping = { Classes: "Classes", Club: "Organisation" };
+    const result = convert({ rows, columns: noAgeColumns, events });
+    expect(result.warnings.some((w) => w.includes("No 'Age' column mapped"))).toBe(true);
+  });
+
+  it("does not warn about Age when it is mapped", () => {
+    const result = convert({ rows, columns, events });
+    expect(result.warnings.some((w) => w.includes("No 'Age' column mapped"))).toBe(false);
+  });
 });

@@ -204,6 +204,12 @@ export function convert(input: ConvertInput): ConvertResult {
   // Sort: Class descending, Ranking descending (numeric; unranked last),
   // Age ascending; original order breaks ties for stability.
   const hasAge = internalNames.includes("Age");
+  if (!hasAge) {
+    warnings.push(
+      "No 'Age' column mapped: entries with the same ranking (or no ranking at " +
+        "all) will keep the CSV's original row order instead of being ordered by age.",
+    );
+  }
   const indexed = siwi.map((r, i) => ({ r, i }));
   indexed.sort((a, b) => {
     const byClass = cmpStr(b.r.Class, a.r.Class);
