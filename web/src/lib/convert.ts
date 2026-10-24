@@ -3,6 +3,7 @@ import type {
   ConvertInput,
   ConvertResult,
   EventClass,
+  GenderSplit,
   Rankings,
   Row,
 } from "./types";
@@ -63,17 +64,64 @@ function guessRegion(stripped: string): string {
   return regions[0];
 }
 
+/**
+ * Rename mapped headers to their internal names. A field mapped to several
+ * headers gets their non-empty values joined with "|" (the originals are kept).
+ */
 function renameColumns(rows: Row[], columns: ColumnMapping): Row[] {
   const rename: Record<string, string> = {};
-  for (const internal of Object.keys(columns)) rename[columns[internal]] = internal;
+  for (const [internal, header] of Object.entries(columns)) {
+    if (!Array.isArray(header)) rename[header] = internal;
+  }
 
   return rows.map((row) => {
     const renamed: Row = {};
     for (const key of Object.keys(row)) {
       renamed[rename[key] ?? key] = row[key];
     }
+    for (const [internal, header] of Object.entries(columns)) {
+      if (Array.isArray(header)) {
+        renamed[internal] = header
+          .map((h) => (row[h] ?? "").trim())
+          .filter((v) => v !== "")
+          .join("|");
+      }
+    }
     return renamed;
   });
+}
+
+/** The individual class values in an athlete's "|"-separated Classes field. */
+function classValues(classes: string): string[] {
+  return classes
+    .split("|")
+    .map((v) => v.trim())
+    .filter((v) => v !== "");
+}
+
+function normaliseGender(value: string): "male" | "female" | null {
+  const v = value.trim().toLowerCase();
+  if (v === "male" || v === "m") return "male";
+  if (v === "female" || v === "f") return "female";
+  return null;
+}
+
+/**
+ * The Siwi class code (and its bib range) an athlete gets for `ev`, split by
+ * gender when configured.
+ */
+function classCode(ev: EventClass, gender: "male" | "female" | null): GenderSplit {
+  const split = gender === "male" ? ev.male : gender === "female" ? ev.female : undefined;
+  if (split?.code.trim()) return { ...split, code: split.code.trim() };
+  return { code: ev.code, bibStart: ev.bibStart, bibEnd: ev.bibEnd };
+}
+
+function hasGenderSplit(ev: EventClass): boolean {
+  return Boolean(ev.male?.code.trim() || ev.female?.code.trim());
+}
+
+function quoteList(values: Iterable<string>): string {
+  return [...values].map((v) => `'${v}'`).join(", ");
 }
 
 function lookupRanking(
@@ -170,23 +218,83 @@ export function convert(input: ConvertInput): ConvertResult {
   });
 
   // Split into per-class entries (an athlete may appear in several classes).
+  const summaryOnly = new Set(input.summaryOnly ?? []);
   const siwiCols = [
     "FirstName",
     "LastName",
     "DOB",
-    ...internalNames.filter((k) => k !== "Classes"),
+    ...internalNames.filter((k) => k !== "Classes" && !summaryOnly.has(k)),
   ];
 
+  const hasGender = internalNames.includes("Gender");
+  // Class value -> codes of the classes that matched it, and how many entrants had it.
+  const valueMatches = new Map<string, Set<string>>();
+  const valueCounts = new Map<string, number>();
+  for (const r of summary) {
+    for (const value of new Set(classValues(r.Classes ?? ""))) {
+      valueMatches.set(value, new Set());
+      valueCounts.set(value, (valueCounts.get(value) ?? 0) + 1);
+    }
+  }
+
   const siwi: Row[] = [];
+  // Bib range for each Siwi class code (null: no bibs), first class row to produce it wins.
+  const bibRanges = new Map<string, GenderSplit | null>();
   for (const ev of events) {
+    const matchedValues = new Set<string>();
+    let unknownGender = 0;
     for (const r of summary) {
-      if (contains(r.Classes ?? "", ev.search)) {
-        const entry: Row = {};
-        for (const col of siwiCols) entry[col] = r[col] ?? "";
-        entry.Class = ev.code;
-        siwi.push(entry);
+      const hits = classValues(r.Classes ?? "").filter((v) => contains(v, ev.search));
+      if (hits.length === 0) continue;
+      for (const v of hits) {
+        matchedValues.add(v);
+        valueMatches.get(v)?.add(ev.code);
+      }
+      const gender = hasGender ? normaliseGender(r.Gender ?? "") : null;
+      if (hasGender && hasGenderSplit(ev) && gender === null) unknownGender++;
+      const split = classCode(ev, gender);
+      const code = split.code;
+      if (!bibRanges.has(code)) bibRanges.set(code, ev.noBibs ? null : split);
+
+      const entry: Row = {};
+      for (const col of siwiCols) entry[col] = r[col] ?? "";
+      entry.Class = code;
+      siwi.push(entry);
+    }
+
+    if (matchedValues.size > 1) {
+      warnings.push(
+        `Search '${ev.search}' (class ${ev.code}) matched ${matchedValues.size} different ` +
+          `values: ${quoteList(matchedValues)}. If that's not intended, make it more ` +
+          `specific, e.g. anchor it with '^'.`,
+      );
+    }
+    if (hasGenderSplit(ev)) {
+      if (!hasGender) {
+        warnings.push(
+          `Class ${ev.code} has male/female codes but no 'Gender' column is mapped, ` +
+            `so its entrants were kept as ${ev.code}.`,
+        );
+      } else if (unknownGender > 0) {
+        warnings.push(
+          `${unknownGender} ${ev.code} entrant(s) had no recognised Gender and were kept as ${ev.code}.`,
+        );
       }
     }
+  }
+
+  for (const [value, codes] of valueMatches) {
+    if (codes.size > 1) {
+      warnings.push(`Class value '${value}' matched several classes: ${quoteList(codes)}.`);
+    }
+  }
+  const unassigned = [...valueMatches]
+    .filter(([, codes]) => codes.size === 0)
+    .map(([value]) => `'${value}' (${valueCounts.get(value)})`);
+  if (unassigned.length > 0) {
+    warnings.push(
+      `Not assigned to any class (still listed in the Summary): ${unassigned.join(", ")}.`,
+    );
   }
 
   const missingClasses = new Set<string>();
@@ -225,12 +333,14 @@ export function convert(input: ConvertInput): ConvertResult {
   const sorted = indexed.map((x) => x.r);
 
   // Assign bibs per class: highest-ranked (first after sort) gets the top bib.
-  for (const ev of events) {
-    const classRows = sorted.filter((r) => r.Class === ev.code);
+  // Classes without bibs keep a blank Bib.
+  for (const [code, ev] of bibRanges) {
+    if (ev === null) continue;
+    const classRows = sorted.filter((r) => r.Class === code);
     const count = classRows.length;
     if (ev.bibEnd - ev.bibStart < count) {
       warnings.push(
-        `Not enough bibs for '${ev.code}': ${count} entrants but range ${ev.bibStart}-${ev.bibEnd} only allows ${ev.bibEnd - ev.bibStart}.`,
+        `Not enough bibs for '${code}': ${count} entrants but range ${ev.bibStart}-${ev.bibEnd} only allows ${ev.bibEnd - ev.bibStart}.`,
       );
     }
     for (let i = 0; i < count; i++) {
@@ -242,7 +352,7 @@ export function convert(input: ConvertInput): ConvertResult {
     "FirstName",
     "LastName",
     "DOB",
-    ...internalNames.filter((k) => k !== "Classes" && k !== "Age"),
+    ...internalNames.filter((k) => k !== "Classes" && k !== "Age" && !summaryOnly.has(k)),
     "Class",
     "Ranking",
     "Bib",

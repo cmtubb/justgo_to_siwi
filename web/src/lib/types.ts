@@ -1,15 +1,32 @@
 export type Row = Record<string, string>;
 
-/** Maps an internal field name (e.g. "Classes") to a JustGo CSV column header. */
-export type ColumnMapping = Record<string, string>;
+/**
+ * Maps an internal field name (e.g. "Classes") to a JustGo CSV column header,
+ * or to several headers whose non-empty values are joined with "|" (for
+ * exports that have one column per class).
+ */
+export type ColumnMapping = Record<string, string | string[]>;
+
+/** The class code (and bib range) entrants of one gender get, e.g. MCSLX. */
+export interface GenderSplit {
+  code: string;
+  bibStart: number;
+  bibEnd: number;
+}
 
 export interface EventClass {
   /** Siwi class code, e.g. "K1M". */
   code: string;
-  /** Substring/regex searched within the athlete's Classes field. */
+  /** Regex tested against each "|"-separated value of the athlete's Classes field. */
   search: string;
   bibStart: number;
   bibEnd: number;
+  /** Code and bibs for male entrants (e.g. "MCSLX"); others keep `code`. Needs a mapped Gender. */
+  male?: GenderSplit;
+  /** Code and bibs for female entrants (e.g. "WCSLX"); others keep `code`. Needs a mapped Gender. */
+  female?: GenderSplit;
+  /** Include the class in Siwi (ranked and sorted) but leave its Bib blank. */
+  noBibs?: boolean;
 }
 
 export interface RankingEntry {
@@ -51,6 +68,8 @@ export interface ConvertInput {
   rankings?: Rankings;
   dobOverrides?: DobOverride[];
   nameRemaps?: NameRemap[];
+  /** Mapped fields kept in the Summary but left out of the Siwi output. */
+  summaryOnly?: string[];
 }
 
 export interface ConvertResult {

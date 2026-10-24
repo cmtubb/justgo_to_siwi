@@ -80,6 +80,176 @@ describe("convert (parity with justgo_to_siwi.py)", () => {
     ]);
     expect(result.forSiwi).toEqual(expected);
   });
+
+  it("reproduces the Python for_siwi output on the one-column-per-class state champs example", () => {
+    const rows = parseCsvString(readFileSync(fixture("example_state_champs.csv"), "utf8"));
+    const expected = parseCsvString(
+      readFileSync(fixture("expected_state_champs_for_siwi.csv"), "utf8"),
+    );
+
+    const result = convert({
+      rows,
+      columns: STATE_CHAMPS_COLUMNS,
+      events: STATE_CHAMPS_EVENTS,
+      summaryOnly: ["Gender", "C2Partner"],
+    });
+
+    expect(result.forSiwiColumns).toEqual([
+      "FirstName",
+      "LastName",
+      "DOB",
+      "Club",
+      "Class",
+      "Ranking",
+      "Bib",
+    ]);
+    expect(result.forSiwi).toEqual(expected);
+    expect(result.summaryColumns).toContain("C2Partner");
+  });
+});
+
+const FORM = "NSW State Champs 2025 - Club:";
+
+const STATE_CHAMPS_COLUMNS: ColumnMapping = {
+  Age: "Age on Event Start Date",
+  Classes: [
+    `${FORM}Class`,
+    FORM,
+    `${FORM}MK1`,
+    `${FORM}MC1`,
+    `${FORM}Labeltext6`,
+    `${FORM}Labeltext7`,
+    `${FORM}Labeltext8`,
+    `${FORM}Labeltext9`,
+  ],
+  Club: "Organisation",
+  Gender: "Gender",
+  C2Partner: `${FORM}C2 partner`,
+};
+
+const STATE_CHAMPS_EVENTS: EventClass[] = [
+  { code: "K1M", search: "^MK1$", bibStart: 1, bibEnd: 80 },
+  { code: "C1M", search: "^MC1$", bibStart: 1, bibEnd: 80 },
+  { code: "K1W", search: "^WK1$", bibStart: 1, bibEnd: 80 },
+  { code: "C1W", search: "^WC1$", bibStart: 1, bibEnd: 80 },
+  {
+    code: "CSLX",
+    search: "^CSLX",
+    bibStart: 1,
+    bibEnd: 80,
+    male: { code: "MCSLX", bibStart: 101, bibEnd: 180 },
+    female: { code: "WCSLX", bibStart: 201, bibEnd: 280 },
+  },
+  { code: "C2", search: "^C2", bibStart: 1, bibEnd: 80, noBibs: true },
+];
+
+describe("convert (one column per class)", () => {
+  const rows: Row[] = [
+    { FirstName: "Sam", LastName: "Jones", DOB: "01/01/2000", Age: "25", Gender: "Male",
+      A: "MK1", B: "MC1", C: "C1 Teams", D: "CSLX", E: "C2 - Open", P: "Elsa" },
+    { FirstName: "Jo", LastName: "Brown", DOB: "01/01/2001", Age: "24", Gender: "Female",
+      A: "WK1", B: "WC1", C: "", D: "CSLX", E: "", P: "" },
+    { FirstName: "Lee", LastName: "Grey", DOB: "01/01/2002", Age: "23", Gender: "",
+      A: "", B: "", C: "", D: "CSLX", E: "", P: "" },
+  ];
+  const columns: ColumnMapping = {
+    Age: "Age",
+    Classes: ["A", "B", "C", "D", "E"],
+    Gender: "Gender",
+    C2Partner: "P",
+  };
+  const run = (events: EventClass[], extra: Partial<Parameters<typeof convert>[0]> = {}) =>
+    convert({ rows, columns, events, ...extra });
+
+  it("joins the non-empty class columns with '|' for the Summary", () => {
+    const result = run([]);
+    expect(result.summary.map((r) => r.Classes)).toEqual([
+      "MK1|MC1|C1 Teams|CSLX|C2 - Open",
+      "WK1|WC1|CSLX",
+      "CSLX",
+    ]);
+  });
+
+  it("matches each class value separately, so '^C1' only picks the teams value", () => {
+    const result = run([{ code: "C1T", search: "^C1", bibStart: 1, bibEnd: 80 }]);
+    expect(result.forSiwi.map((r) => r.FirstName)).toEqual(["Sam"]);
+    expect(result.warnings.some((w) => w.includes("matched 2 different"))).toBe(false);
+  });
+
+  it("warns when a search matches several different values", () => {
+    const result = run([{ code: "C1T", search: "C1", bibStart: 1, bibEnd: 80 }]);
+    const warning = result.warnings.find((w) => w.includes("matched 3 different values"));
+    expect(warning).toContain("'MC1', 'C1 Teams', 'WC1'");
+  });
+
+  it("warns when one value matches several classes", () => {
+    const result = run([
+      { code: "K1M", search: "MK1", bibStart: 1, bibEnd: 80 },
+      { code: "K1X", search: "K1", bibStart: 1, bibEnd: 80 },
+    ]);
+    expect(result.warnings).toContain("Class value 'MK1' matched several classes: 'K1M', 'K1X'.");
+  });
+
+  it("lists class values no class picked up, with entrant counts", () => {
+    const result = run([{ code: "CSLX", search: "^CSLX", bibStart: 1, bibEnd: 80 }]);
+    const warning = result.warnings.find((w) => w.startsWith("Not assigned to any class"));
+    expect(warning).toContain("'MK1' (1)");
+    expect(warning).not.toContain("'CSLX'");
+  });
+
+  it("splits a class by gender with its own bib ranges, falling back when gender is unknown", () => {
+    const cslx: EventClass = {
+      code: "CSLX", search: "^CSLX", bibStart: 1, bibEnd: 80,
+      male: { code: "MCSLX", bibStart: 101, bibEnd: 180 },
+      female: { code: "WCSLX", bibStart: 201, bibEnd: 280 },
+    };
+    const result = run([cslx]);
+    const classes = Object.fromEntries(
+      result.forSiwi.map((r) => [r.FirstName, `${r.Class} ${r.Bib}`]),
+    );
+    expect(classes).toEqual({ Sam: "MCSLX 101", Jo: "WCSLX 201", Lee: "CSLX 1" });
+    expect(result.warnings).toContain(
+      "1 CSLX entrant(s) had no recognised Gender and were kept as CSLX.",
+    );
+  });
+
+  it("keeps a gender-split class as its own code when Gender isn't mapped", () => {
+    const { Gender: _, ...noGender } = columns;
+    const result = convert({
+      rows,
+      columns: noGender,
+      events: [
+        {
+          code: "CSLX", search: "^CSLX", bibStart: 1, bibEnd: 80,
+          male: { code: "MCSLX", bibStart: 1, bibEnd: 80 },
+        },
+      ],
+    });
+    expect(result.forSiwi.map((r) => r.Class)).toEqual(["CSLX", "CSLX", "CSLX"]);
+    expect(result.warnings.some((w) => w.includes("no 'Gender' column is mapped"))).toBe(true);
+  });
+
+  it("includes no-bib classes in Siwi with a blank Bib", () => {
+    const result = run([
+      { code: "K1M", search: "^MK1$", bibStart: 1, bibEnd: 80 },
+      { code: "C2", search: "^C2", bibStart: 1, bibEnd: 0, noBibs: true },
+    ]);
+    const bibs = Object.fromEntries(result.forSiwi.map((r) => [r.Class, r.Bib]));
+    expect(bibs).toEqual({ K1M: "1", C2: "" });
+    expect(result.warnings.some((w) => w.includes("Not enough bibs"))).toBe(false);
+  });
+
+  it("keeps summary-only fields in the Summary but not the Siwi output", () => {
+    const result = run([{ code: "K1M", search: "^MK1$", bibStart: 1, bibEnd: 80 }], {
+      summaryOnly: ["Gender", "C2Partner"],
+    });
+    expect(result.summaryColumns).toEqual(
+      expect.arrayContaining(["Gender", "C2Partner"]),
+    );
+    expect(result.summary[0].C2Partner).toBe("Elsa");
+    expect(result.forSiwiColumns).not.toContain("C2Partner");
+    expect(result.forSiwiColumns).not.toContain("Gender");
+  });
 });
 
 describe("convert (targeted behaviour)", () => {

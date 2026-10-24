@@ -13,11 +13,20 @@ served as a static site (e.g. GitHub Pages) with no backend.
 Once deployed to GitHub Pages, open the published URL and follow the steps:
 
 1. **Upload attendee CSV** — the JustGo export.
-2. **Map columns** — match the `Classes`, `Age`, and `Club` fields to the CSV's
-   column headers. Mapping `Club` to the `Organisation` column enables the same
-   club-acronym guessing as the Python script.
+2. **Map columns** — match the `Classes`, `Age`, `Club` and (optionally)
+   `Gender` fields to the CSV's column headers. Mapping `Club` to the
+   `Organisation` column enables the same club-acronym guessing as the Python
+   script. If the export has one column per class, add each of them to
+   `Classes` with **+ column**; their values are joined with `|`. Untick
+   **Siwi** to keep a field (e.g. a C2 partner) in the Summary only.
 3. **Define classes & bib ranges** — one row per Siwi class, with the text to
-   search for in each athlete's Classes field and the bib number range.
+   search for in each of the athlete's Classes values and the bib number
+   range. Optional **male / female codes** split a class by `Gender` (e.g.
+   `CSLX` into `MCSLX` / `WCSLX`), each with its own bib range; unticking
+   **Bibs** keeps a class (e.g. `C2`) in the Siwi output with blank bibs.
+   Values no class picks up stay in the Summary only. Warnings flag searches
+   that match several different values, values matched by several classes, and
+   values no class picked up.
 4. **Rankings (optional)** — pick a built-in ICF world ranking release to seed
    bibs by ranking, or leave it on "None" to order bibs by age only.
 5. **Generate** — preview the results and download `for_siwi_*.csv` and

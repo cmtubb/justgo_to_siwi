@@ -102,6 +102,9 @@ python src/races/convert_2026_nationals.py --example
 
 # Age nationals example
 python src/races/convert_2025_age_nationals.py --example
+
+# NSW State Champs example (one column per class)
+python src/races/convert_2026_nsw_state_champs.py --example
 ```
 
 For a real event, run the script without `--example` after placing the CSV in the expected `data/` subdirectory (paths are configured in each script).
@@ -121,8 +124,13 @@ These output files are also gitignored.
 
 Create a new script in `src/races/` following an existing one. You need to configure:
 
-- **`columns`** — maps internal field names to JustGo CSV column headers
-- **`events`** — maps Siwi class codes to `(search_string, (bib_start, bib_end))` tuples; the search string is matched against the classes column
+- **`columns`** — maps internal field names to JustGo CSV column headers. For exports with one column per class, map `Classes` to a list of headers; their non-empty values are joined with `|`
+- **`events`** — maps Siwi class codes to `(search_string, (bib_start, bib_end))` tuples; the search string is a regex tested against each `|`-separated value of the classes column (so `^C1` won't match `MC1`). An optional third item takes options:
+  - `{"male": "MCSLX", "female": "WCSLX"}` — split the class by a mapped `Gender` column; anyone else keeps the class code. Give a split its own bib range with `("MCSLX", (101, 180))`
+  - `{"bibs": False}` — include the class in the Siwi output but leave its Bib blank
+
+  Class values that no event matches (e.g. teams events) are left out of the Siwi output but still appear in the Summary.
+- **`summary_only`** (optional) — mapped fields to keep in the Summary but leave out of the Siwi output, e.g. `["Gender", "C2Partner"]`
 - **`datadir` / `infile`** — where the input CSV lives
 - **`rankings`** — path to an ICF ranking release JSON file (see `web/public/rankings/`)
 
@@ -135,6 +143,8 @@ jgs = JustGoToSiwi(datadir, infile, out_ident, events, columns, rankings)
 df, df_r, df_siwi = jgs.calculate()
 ```
 
+`calculate()` prints warnings (also kept in `jgs.warnings`) for searches that match several different class values, values matched by several classes, values no class picked up, and classes with no ranking data.
+
 ## Existing race scripts
 
 | Script | Event |
@@ -143,3 +153,4 @@ df, df_r, df_siwi = jgs.calculate()
 | `convert_2025_age_nationals.py` | 2026 Age Nationals (rescheduled) |
 | `convert_2026_may_wswc_club_race.py` | WS Whitewater Club race (May 2026) |
 | `convert_2026_may_v2_wswc_club_race.py` | WS Whitewater Club race v2 (May 2026) |
+| `convert_2026_nsw_state_champs.py` | NSW State Champs (one column per class) |

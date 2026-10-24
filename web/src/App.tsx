@@ -23,10 +23,13 @@ import type {
 type RankingSource = "none" | "builtin";
 
 const DEFAULT_MAPPINGS: Mapping[] = [
-  { internal: "Age", header: "" },
-  { internal: "Classes", header: "" },
-  { internal: "Club", header: "" },
+  { internal: "Age", headers: [""], summaryOnly: false },
+  { internal: "Classes", headers: [""], summaryOnly: false },
+  { internal: "Club", headers: [""], summaryOnly: false },
+  { internal: "Gender", headers: [""], summaryOnly: true },
 ];
+
+const SAMPLES_PER_COLUMN = 2;
 
 const DEFAULT_EVENTS: EventClass[] = [
   { code: "K1M", search: "Men's K1", bibStart: 1, bibEnd: 80 },
@@ -132,13 +135,35 @@ export default function App() {
     if (rankingIndex) loadRelease(rankingIndex, releaseId);
   };
 
+  // A few distinct non-empty values per column, shown beside each header.
+  const samples = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    for (const h of csv?.headers ?? []) {
+      const seen = new Set<string>();
+      for (const row of csv?.rows ?? []) {
+        const v = (row[h] ?? "").trim();
+        if (v) seen.add(v);
+        if (seen.size >= SAMPLES_PER_COLUMN) break;
+      }
+      out[h] = [...seen];
+    }
+    return out;
+  }, [csv]);
+
   const columns: ColumnMapping = useMemo(() => {
     const out: ColumnMapping = {};
     for (const m of mappings) {
-      if (m.internal.trim() && m.header) out[m.internal.trim()] = m.header;
+      const headers = m.headers.filter((h) => h);
+      if (!m.internal.trim() || headers.length === 0) continue;
+      out[m.internal.trim()] = headers.length === 1 ? headers[0] : headers;
     }
     return out;
   }, [mappings]);
+
+  const summaryOnly = useMemo(
+    () => mappings.filter((m) => m.summaryOnly).map((m) => m.internal.trim()),
+    [mappings],
+  );
 
   const outputIdent = ident.trim() || "event";
 
@@ -159,6 +184,7 @@ export default function App() {
         columns,
         events: readyEvents,
         rankings: rankings ?? undefined,
+        summaryOnly,
       });
       setResult(res);
     } catch (e) {
@@ -201,6 +227,7 @@ export default function App() {
         {csv ? (
           <ColumnMapper
             headers={csv.headers}
+            samples={samples}
             mappings={mappings}
             onChange={setMappings}
           />
