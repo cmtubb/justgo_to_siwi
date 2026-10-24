@@ -16,9 +16,11 @@ Once deployed to GitHub Pages, open the published URL and follow the steps:
 2. **Map columns** — match the `Classes`, `Age`, `Club` and (optionally)
    `Gender` fields to the CSV's column headers. Mapping `Club` to the
    `Organisation` column enables the same club-acronym guessing as the Python
-   script. If the export has one column per class, add each of them to
-   `Classes` with **+ column**; their values are joined with `|`. Untick
-   **Siwi** to keep a field (e.g. a C2 partner) in the Summary only.
+   script. If the export has one column per class, use **pick several
+   columns** on `Classes` and tick each of them (type in the filter, e.g. the
+   form name, then **Select shown** to tick them in one go); their values are
+   joined with `|`. Untick **Siwi** to keep a field (e.g. a C2 partner) in the
+   Summary only.
 3. **Define classes & bib ranges** — one row per Siwi class, with the text to
    search for in each of the athlete's Classes values and the bib number
    range. Optional **male / female codes** split a class by `Gender` (e.g.

@@ -23,10 +23,10 @@ import type {
 type RankingSource = "none" | "builtin";
 
 const DEFAULT_MAPPINGS: Mapping[] = [
-  { internal: "Age", headers: [""], summaryOnly: false },
-  { internal: "Classes", headers: [""], summaryOnly: false },
-  { internal: "Club", headers: [""], summaryOnly: false },
-  { internal: "Gender", headers: [""], summaryOnly: true },
+  { internal: "Age", headers: [""], multi: false, summaryOnly: false },
+  { internal: "Classes", headers: [""], multi: false, summaryOnly: false },
+  { internal: "Club", headers: [""], multi: false, summaryOnly: false },
+  { internal: "Gender", headers: [""], multi: false, summaryOnly: true },
 ];
 
 const SAMPLES_PER_COLUMN = 2;
