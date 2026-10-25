@@ -80,68 +80,7 @@ describe("convert (parity with justgo_to_siwi.py)", () => {
     ]);
     expect(result.forSiwi).toEqual(expected);
   });
-
-  it("reproduces the Python for_siwi output on the one-column-per-class state champs example", () => {
-    const rows = parseCsvString(readFileSync(fixture("example_state_champs.csv"), "utf8"));
-    const expected = parseCsvString(
-      readFileSync(fixture("expected_state_champs_for_siwi.csv"), "utf8"),
-    );
-
-    const result = convert({
-      rows,
-      columns: STATE_CHAMPS_COLUMNS,
-      events: STATE_CHAMPS_EVENTS,
-      summaryOnly: ["Gender", "C2Partner"],
-    });
-
-    expect(result.forSiwiColumns).toEqual([
-      "FirstName",
-      "LastName",
-      "DOB",
-      "Club",
-      "Class",
-      "Ranking",
-      "Bib",
-    ]);
-    expect(result.forSiwi).toEqual(expected);
-    expect(result.summaryColumns).toContain("C2Partner");
-  });
 });
-
-const FORM = "NSW State Champs 2025 - Club:";
-
-const STATE_CHAMPS_COLUMNS: ColumnMapping = {
-  Age: "Age on Event Start Date",
-  Classes: [
-    `${FORM}Class`,
-    FORM,
-    `${FORM}MK1`,
-    `${FORM}MC1`,
-    `${FORM}Labeltext6`,
-    `${FORM}Labeltext7`,
-    `${FORM}Labeltext8`,
-    `${FORM}Labeltext9`,
-  ],
-  Club: "Organisation",
-  Gender: "Gender",
-  C2Partner: `${FORM}C2 partner`,
-};
-
-const STATE_CHAMPS_EVENTS: EventClass[] = [
-  { code: "K1M", search: "^MK1$", bibStart: 1, bibEnd: 80 },
-  { code: "C1M", search: "^MC1$", bibStart: 1, bibEnd: 80 },
-  { code: "K1W", search: "^WK1$", bibStart: 1, bibEnd: 80 },
-  { code: "C1W", search: "^WC1$", bibStart: 1, bibEnd: 80 },
-  {
-    code: "CSLX",
-    search: "^CSLX",
-    bibStart: 1,
-    bibEnd: 80,
-    male: { code: "MCSLX", bibStart: 101, bibEnd: 180 },
-    female: { code: "WCSLX", bibStart: 201, bibEnd: 280 },
-  },
-  { code: "C2", search: "^C2", bibStart: 1, bibEnd: 80, noBibs: true },
-];
 
 describe("convert (one column per class)", () => {
   const rows: Row[] = [

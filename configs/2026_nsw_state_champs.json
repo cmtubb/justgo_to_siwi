@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "outputName": "2026_nsw_state_champs",
+  "columns": [
+    {
+      "field": "Age",
+      "columns": [
+        "Age on Event Start Date"
+      ]
+    },
+    {
+      "field": "Classes",
+      "columns": [
+        "NSW State Champs 2025 - Club:Class",
+        "NSW State Champs 2025 - Club:",
+        "NSW State Champs 2025 - Club:MK1",
+        "NSW State Champs 2025 - Club:MC1",
+        "NSW State Champs 2025 - Club:Labeltext6",
+        "NSW State Champs 2025 - Club:Labeltext7",
+        "NSW State Champs 2025 - Club:Labeltext8",
+        "NSW State Champs 2025 - Club:Labeltext9"
+      ]
+    },
+    {
+      "field": "Club",
+      "columns": [
+        "Organisation"
+      ]
+    },
+    {
+      "field": "Gender",
+      "columns": [
+        "Gender"
+      ],
+      "siwi": false
+    },
+    {
+      "field": "C2Partner",
+      "columns": [
+        "NSW State Champs 2025 - Club:C2 partner"
+      ],
+      "siwi": false
+    }
+  ],
+  "classes": [
+    {
+      "code": "K1M",
+      "search": "^MK1$",
+      "bibs": [1, 80]
+    },
+    {
+      "code": "C1M",
+      "search": "^MC1$",
+      "bibs": [1, 80]
+    },
+    {
+      "code": "K1W",
+      "search": "^WK1$",
+      "bibs": [1, 80]
+    },
+    {
+      "code": "C1W",
+      "search": "^WC1$",
+      "bibs": [1, 80]
+    },
+    {
+      "code": "CSLX",
+      "search": "^CSLX",
+      "bibs": [1, 80],
+      "male": {
+        "code": "MCSLX",
+        "bibs": [101, 180]
+      },
+      "female": {
+        "code": "WCSLX",
+        "bibs": [201, 280]
+      }
+    },
+    {
+      "code": "C2",
+      "search": "^C2",
+      "bibs": null
+    }
+  ],
+  "rankings": "2026-2",
+  "dobOverrides": [],
+  "nameRemaps": []
+}

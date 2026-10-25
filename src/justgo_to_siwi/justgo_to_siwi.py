@@ -14,11 +14,14 @@ class JustGoToSiwi():
                  out_ident: Path | str,
                  events : dict[str, tuple],
                  columns : dict[str, str | list[str]],
-                 rankings : Path | str,
-                 summary_only : list[str] | None = None):
+                 rankings : Path | str | None,
+                 summary_only : list[str] | None = None,
+                 dob_overrides : list[tuple[str, str]] | None = None,
+                 name_remaps : list[tuple[str, str]] | None = None,
+                 out_dir : Path | str | None = None):
         """`rankings` is a path to one release JSON file from
         `web/public/rankings/` (e.g. `.../2026-2.json`), as produced by
-        `src/tools/get_icf_rankings.py`.
+        `src/tools/get_icf_rankings.py`, or None to leave everyone unranked.
 
         `events` maps a class code to `(search, (bib_start, bib_end))`, with an
         optional third item of options:
@@ -33,7 +36,16 @@ class JustGoToSiwi():
         joined with "|" (for exports with one column per class).
 
         `summary_only` lists mapped fields kept in the Summary but left out of
-        the Siwi output (e.g. a C2 partner column)."""
+        the Siwi output (e.g. a C2 partner column).
+
+        `dob_overrides` are `(last_name, dob)` pairs forcing a DOB by surname;
+        `name_remaps` are `("LASTNAME First", "LASTNAME Other")` pairs applied
+        before the ranking lookup.
+
+        Output files go to `out_dir`, defaulting to `datadir`.
+
+        Most races are configured with a JSON file instead; see
+        `justgo_to_siwi.config` and `justgo_to_siwi_convert.py`."""
         self.input = (Path(datadir) / infile).resolve()
 
 
@@ -42,11 +54,14 @@ class JustGoToSiwi():
         self.out_ident = out_ident
         self.rankings = rankings
         self.summary_only = summary_only or []
+        self.dob_overrides = dob_overrides or []
+        self.name_remaps = name_remaps or []
         self.warnings: list[str] = []
 
         self.timestamp=time.strftime('%Y-%m-%d_%H%M')
-        self.raceinfo = Path(datadir) / f"race_info_{self.out_ident}_{self.timestamp}.xlsx"
-        self.forsiwi = Path(datadir) / f"for_siwi_{self.out_ident}_{self.timestamp}.csv"
+        out_dir = Path(out_dir if out_dir is not None else datadir)
+        self.raceinfo = out_dir / f"race_info_{self.out_ident}_{self.timestamp}.xlsx"
+        self.forsiwi = out_dir / f"for_siwi_{self.out_ident}_{self.timestamp}.csv"
 
 
     def warn(self, message: str) -> None:
@@ -85,8 +100,8 @@ class JustGoToSiwi():
 
         df = df.rename(columns=column_rename)
 
-        # Get Kevin in the right age group :)
-        df.loc[df['LastName'] == 'Songberg','DOB'] = "01/01/1955"
+        for last_name, dob in self.dob_overrides:
+            df.loc[df['LastName'] == last_name, 'DOB'] = dob
 
         regex = re.compile(r" \(CL[0-9]+\)")
         if "Club" in self.columns.keys() and self.columns["Club"] == 'Organisation':
@@ -164,7 +179,9 @@ class JustGoToSiwi():
             matched = list(dict.fromkeys(v for vs in hits for v in vs))
             for v in matched:
                 value_matches[v][cl] = None
-            if len(matched) > 1:
+            if not matched:
+                self.warn(f"Class {cl} (search '{search_name}') matched no entrants.")
+            elif len(matched) > 1:
                 self.warn(f"Search '{search_name}' (class {cl}) matched {len(matched)} different values: "
                           f"{', '.join(repr(v) for v in matched)}. If that's not intended, make it more "
                           "specific, e.g. anchor it with '^'.")
@@ -198,8 +215,10 @@ class JustGoToSiwi():
         df_siwi = pd.concat( class_df, axis=0)
         df_siwi.reset_index(drop=True, inplace=True)
 
-        with open(self.rankings, encoding="utf-8") as f:
-            release = json.load(f)
+        release = {"classes": {}}
+        if self.rankings is not None:
+            with open(self.rankings, encoding="utf-8") as f:
+                release = json.load(f)
 
         rankings = {}
         missing = []
@@ -209,7 +228,7 @@ class JustGoToSiwi():
                 missing.append(cl)
                 entries = []
             rankings[cl] = pd.DataFrame(entries, columns=["name", "ranking"])
-        if missing:
+        if missing and self.rankings is not None:
             self.warn(f"No ranking data for: {', '.join(missing)} in {self.rankings}. "
                       "Those entries were left unranked.")
 
@@ -221,8 +240,9 @@ class JustGoToSiwi():
             name = f"{athlete['LastName']} {athlete['FirstName']}"
             cl = athlete['Class']
 
-            if name == "O'CALLAGHAN Georgie":
-                name = "O'CALLAGHAN Georgia"
+            for remap_from, remap_to in self.name_remaps:
+                if name == remap_from:
+                    name = remap_to
 
             selected = rankings[cl]['name'].str.contains(name)
 
@@ -247,11 +267,18 @@ class JustGoToSiwi():
         # compares unpredictably.
         df_siwi_ranking['_is_ranked'] = siwi_is_ranked
         df_siwi_ranking['_ranking_value'] = siwi_ranking_value
+        has_age = "Age" in df_siwi_ranking.columns
+        if not has_age:
+            self.warn("No 'Age' column mapped: entries with the same ranking (or no ranking at "
+                      "all) will keep the CSV's original row order instead of being ordered by age.")
+        sort_by = ['Class', '_is_ranked', '_ranking_value'] + (['Age'] if has_age else [])
         df_siwi_ranking = df_siwi_ranking.sort_values(
-            ['Class', '_is_ranked', '_ranking_value', 'Age'],
-            ascending=[False, True, False, True],
+            sort_by,
+            ascending=[False, True, False, True][:len(sort_by)],
+            kind="stable",
         )
-        df_siwi_ranking = df_siwi_ranking.drop(columns=['Age', '_is_ranked', '_ranking_value'])
+        df_siwi_ranking = df_siwi_ranking.drop(
+            columns=(['Age'] if has_age else []) + ['_is_ranked', '_ranking_value'])
         df_siwi_ranking.reset_index(drop=True, inplace=True)
 
         df_siwi_ranking["Bib"] = 0

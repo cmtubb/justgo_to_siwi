@@ -26,3 +26,14 @@ sources = ["src"]
 # Our importable package lives under `src/`.
 packages = ["src/justgo_to_siwi"]
 
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.uv]
+# Only resolve package versions that have been public for at least 14 days.
+exclude-newer = "14 days"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]

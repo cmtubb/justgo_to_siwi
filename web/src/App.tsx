@@ -1,10 +1,19 @@
 import { useMemo, useState } from "react";
 import "./App.css";
-import { ColumnMapper, type Mapping } from "./components/ColumnMapper";
+import { ColumnMapper } from "./components/ColumnMapper";
 import { EventEditor } from "./components/EventEditor";
+import { FixesEditor } from "./components/FixesEditor";
 import { ResultView } from "./components/ResultView";
+import {
+  buildConfig,
+  checkMappings,
+  convertInput,
+  formatConfig,
+  parseConfig,
+} from "./lib/config";
 import { convert } from "./lib/convert";
 import {
+  downloadConfigJson,
   downloadForSiwiCsv,
   downloadRaceInfoXlsx,
   fetchRankingIndex,
@@ -13,9 +22,11 @@ import {
   type ParsedCsv,
 } from "./lib/io";
 import type {
-  ColumnMapping,
   ConvertResult,
+  DobOverride,
   EventClass,
+  Mapping,
+  NameRemap,
   RankingIndex,
   Rankings,
 } from "./lib/types";
@@ -73,7 +84,13 @@ export default function App() {
   const [rankingIndexLoading, setRankingIndexLoading] = useState(false);
   const [selectedRelease, setSelectedRelease] = useState<string | null>(null);
   const [releaseLoading, setReleaseLoading] = useState(false);
+  const [dobOverrides, setDobOverrides] = useState<DobOverride[]>([]);
+  const [nameRemaps, setNameRemaps] = useState<NameRemap[]>([]);
   const [ident, setIdent] = useState("event");
+  const [configName, setConfigName] = useState("");
+  // From reading the config file, and from checking its columns against the CSV.
+  const [configWarnings, setConfigWarnings] = useState<string[]>([]);
+  const [columnWarnings, setColumnWarnings] = useState<string[]>([]);
   const [result, setResult] = useState<ConvertResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +102,10 @@ export default function App() {
       const parsed = await parseCsv(file);
       setCsv(parsed);
       setCsvName(file.name);
+      // Mappings from a config (or an earlier CSV) may name columns this CSV lacks.
+      const checked = checkMappings(mappings, parsed.headers);
+      setMappings(checked.mappings);
+      setColumnWarnings(checked.warnings);
     } catch (e) {
       setError(`Could not parse CSV: ${String(e)}`);
     }
@@ -106,29 +127,89 @@ export default function App() {
     }
   };
 
+  const ensureRankingIndex = async (): Promise<RankingIndex | null> => {
+    if (rankingIndex) return rankingIndex;
+    setRankingIndexLoading(true);
+    try {
+      const index = await fetchRankingIndex();
+      setRankingIndex(index);
+      return index;
+    } catch (e) {
+      setError(`Could not load ranking releases: ${String(e)}`);
+      return null;
+    } finally {
+      setRankingIndexLoading(false);
+    }
+  };
+
   const selectRankingSource = async (next: RankingSource) => {
     setRankingSource(next);
     setError(null);
     setRankings(null);
     if (next !== "builtin") return;
 
-    if (rankingIndex) {
-      const releaseId = selectedRelease ?? rankingIndex.releases[0]?.id;
-      if (releaseId) await loadRelease(rankingIndex, releaseId);
+    const index = await ensureRankingIndex();
+    const releaseId = selectedRelease ?? index?.releases[0]?.id;
+    if (index && releaseId) await loadRelease(index, releaseId);
+  };
+
+  /** Select a config's ranking release, returning a warning if it isn't available. */
+  const applyConfigRankings = async (releaseId: string | null): Promise<string | null> => {
+    if (releaseId === null) {
+      await selectRankingSource("none");
+      return null;
+    }
+    const index = await ensureRankingIndex();
+    if (!index?.releases.some((r) => r.id === releaseId)) {
+      await selectRankingSource("none");
+      const available = index?.releases.map((r) => r.id).join(", ") || "none";
+      return `Ranking release '${releaseId}' isn't available (available: ${available}), so rankings were set to None.`;
+    }
+    setRankingSource("builtin");
+    setRankings(null);
+    await loadRelease(index, releaseId);
+    return null;
+  };
+
+  const onConfig = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    setResult(null);
+    const parsed = parseConfig(await file.text());
+    if (!parsed.settings) {
+      setConfigName("");
+      setConfigWarnings([]);
+      setError(`Could not load config ${file.name}: ${parsed.errors.join(" ")}`);
       return;
     }
-
-    setRankingIndexLoading(true);
-    try {
-      const index = await fetchRankingIndex();
-      setRankingIndex(index);
-      const releaseId = index.releases[0]?.id;
-      if (releaseId) await loadRelease(index, releaseId);
-    } catch (e) {
-      setError(`Could not load ranking releases: ${String(e)}`);
-    } finally {
-      setRankingIndexLoading(false);
+    const { settings } = parsed;
+    setConfigName(file.name);
+    setEvents(settings.events);
+    setIdent(settings.outputName || "event");
+    setDobOverrides(settings.dobOverrides);
+    setNameRemaps(settings.nameRemaps);
+    if (csv) {
+      const checked = checkMappings(settings.mappings, csv.headers);
+      setMappings(checked.mappings);
+      setColumnWarnings(checked.warnings);
+    } else {
+      setMappings(settings.mappings);
+      setColumnWarnings([]);
     }
+    const rankingWarning = await applyConfigRankings(settings.rankings);
+    setConfigWarnings([...parsed.warnings, ...(rankingWarning ? [rankingWarning] : [])]);
+  };
+
+  const saveConfig = () => {
+    const config = buildConfig({
+      mappings,
+      events,
+      rankings: rankingSource === "builtin" ? selectedRelease : null,
+      outputName: outputIdent,
+      dobOverrides,
+      nameRemaps,
+    });
+    downloadConfigJson(formatConfig(config), outputIdent);
   };
 
   const onSelectRelease = (releaseId: string) => {
@@ -150,42 +231,25 @@ export default function App() {
     return out;
   }, [csv]);
 
-  const columns: ColumnMapping = useMemo(() => {
-    const out: ColumnMapping = {};
-    for (const m of mappings) {
-      const headers = m.headers.filter((h) => h);
-      if (!m.internal.trim() || headers.length === 0) continue;
-      out[m.internal.trim()] = headers.length === 1 ? headers[0] : headers;
-    }
-    return out;
-  }, [mappings]);
-
-  const summaryOnly = useMemo(
-    () => mappings.filter((m) => m.summaryOnly).map((m) => m.internal.trim()),
-    [mappings],
+  const input = useMemo(
+    () =>
+      convertInput(
+        { mappings, events, dobOverrides, nameRemaps },
+        csv?.rows ?? [],
+        rankings ?? undefined,
+      ),
+    [mappings, events, dobOverrides, nameRemaps, csv, rankings],
   );
 
   const outputIdent = ident.trim() || "event";
 
-  const readyEvents = useMemo(
-    () => events.filter((e) => e.code.trim() && e.search.trim()),
-    [events],
-  );
-
-  const canConvert =
-    csv !== null && "Classes" in columns && readyEvents.length > 0;
+  const canConvert = csv !== null && "Classes" in input.columns && input.events.length > 0;
 
   const runConvert = () => {
     if (!csv) return;
     setError(null);
     try {
-      const res = convert({
-        rows: csv.rows,
-        columns,
-        events: readyEvents,
-        rankings: rankings ?? undefined,
-        summaryOnly,
-      });
+      const res = convert(input);
       setResult(res);
     } catch (e) {
       setError(`Conversion failed: ${String(e)}`);
@@ -221,6 +285,36 @@ export default function App() {
             {csv.headers.length} columns.
           </p>
         )}
+        <h3 className="sub-head">Race config (optional)</h3>
+        <p className="hint">
+          Load a config saved from an earlier run (<strong>Save config</strong>{" "}
+          in the last step) to fill in every step below. Settings that don't fit
+          this CSV are left out, with a warning.
+        </p>
+        <input
+          className="file-input"
+          type="file"
+          accept=".json,application/json"
+          onChange={(e) => {
+            onConfig(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+        {configName && (
+          <p className="hint">
+            Loaded config <strong>{configName}</strong>.
+          </p>
+        )}
+        {(configWarnings.length > 0 || columnWarnings.length > 0) && (
+          <div className="warnings">
+            <strong>Config warnings</strong>
+            <ul>
+              {[...configWarnings, ...columnWarnings].map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Step>
 
       <Step num={2} title="Map columns" disabled={!csv}>
@@ -240,7 +334,16 @@ export default function App() {
         <EventEditor events={events} onChange={setEvents} />
       </Step>
 
-      <Step num={4} title="Rankings (optional)" disabled={!csv}>
+      <Step num={4} title="Athlete fixes (optional)" disabled={!csv}>
+        <FixesEditor
+          dobOverrides={dobOverrides}
+          nameRemaps={nameRemaps}
+          onDobOverrides={setDobOverrides}
+          onNameRemaps={setNameRemaps}
+        />
+      </Step>
+
+      <Step num={5} title="Rankings (optional)" disabled={!csv}>
         <p className="hint">
           Seed bib numbers from an ICF world ranking release. Skip this to
           order bibs by age only.
@@ -295,7 +398,7 @@ export default function App() {
         )}
       </Step>
 
-      <Step num={5} title="Generate">
+      <Step num={6} title="Generate">
         <div className="row">
           <label>
             Output name:{" "}
@@ -303,6 +406,9 @@ export default function App() {
           </label>
           <button className="primary" disabled={!canConvert} onClick={runConvert}>
             Convert
+          </button>
+          <button onClick={saveConfig} title="Download these settings to reuse next time">
+            Save config
           </button>
         </div>
         {!canConvert && (

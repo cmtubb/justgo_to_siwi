@@ -61,6 +61,36 @@ export interface NameRemap {
   to: string;
 }
 
+/** One row of the column-mapping step. */
+export interface Mapping {
+  internal: string;
+  /** One or more CSV columns; several are joined with "|" (one column per class). */
+  headers: string[];
+  /** Pick columns from a checklist instead of a single dropdown. */
+  multi: boolean;
+  /** Keep the field in the Summary only, not the Siwi output. */
+  summaryOnly: boolean;
+}
+
+/** A race config file (shared with justgo_to_siwi_convert.py). */
+export interface SiwiConfig {
+  version: 1;
+  outputName?: string;
+  columns: { field: string; columns: string[]; siwi?: boolean }[];
+  classes: {
+    code: string;
+    search: string;
+    /** [start, end], or null for no bibs. */
+    bibs: [number, number] | null;
+    male?: { code: string; bibs?: [number, number] };
+    female?: { code: string; bibs?: [number, number] };
+  }[];
+  /** Ranking release id (e.g. "2026-2"), or null for none. */
+  rankings?: string | null;
+  dobOverrides?: DobOverride[];
+  nameRemaps?: NameRemap[];
+}
+
 export interface ConvertInput {
   rows: Row[];
   columns: ColumnMapping;

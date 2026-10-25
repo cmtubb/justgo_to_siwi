@@ -101,6 +101,11 @@ export function downloadForSiwiCsv(result: ConvertResult, ident: string): void {
   triggerDownload(`for_siwi_${ident}_${timestamp()}.csv`, blob);
 }
 
+export function downloadConfigJson(text: string, ident: string): void {
+  const blob = new Blob([text], { type: "application/json" });
+  triggerDownload(`${ident}.siwi-config.json`, blob);
+}
+
 export function downloadRaceInfoXlsx(result: ConvertResult, ident: string): void {
   const wb = XLSX.utils.book_new();
   const summarySheet = XLSX.utils.aoa_to_sheet(

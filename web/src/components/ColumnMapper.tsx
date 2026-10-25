@@ -1,14 +1,5 @@
 import { useState } from "react";
-
-export interface Mapping {
-  internal: string;
-  /** One or more CSV columns; several are joined with "|" (one column per class). */
-  headers: string[];
-  /** Pick columns from a checklist instead of a single dropdown. */
-  multi: boolean;
-  /** Keep the field in the Summary only, not the Siwi output. */
-  summaryOnly: boolean;
-}
+import type { Mapping } from "../lib/types";
 
 interface Props {
   headers: string[];
@@ -19,7 +10,7 @@ interface Props {
 }
 
 // These never go to Siwi as fields of their own, so the Siwi toggle doesn't apply.
-const NOT_IN_SIWI = new Set(["Classes", "Age"]);
+export const NOT_IN_SIWI = new Set(["Classes", "Age"]);
 const SAMPLE_CHARS = 30;
 
 function isBlank(h: string): boolean {

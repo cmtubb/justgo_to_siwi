@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "outputName": "2026_age_nationals",
+  "columns": [
+    {
+      "field": "Age",
+      "columns": [
+        "Age on Event Start Date"
+      ]
+    },
+    {
+      "field": "Classes",
+      "columns": [
+        "2026 Canoe Slalom Age Nats - Rescheduled - NGB:Events Entered"
+      ]
+    },
+    {
+      "field": "Club",
+      "columns": [
+        "2026 Canoe Slalom Age Nats - Rescheduled - NGB:Paddler's Club they are representing (if applicabl"
+      ]
+    },
+    {
+      "field": "School",
+      "columns": [
+        "2026 Canoe Slalom Age Nats - Rescheduled - NGB:Paddler's School they are representing (if applica"
+      ]
+    }
+  ],
+  "classes": [
+    {
+      "code": "K1M",
+      "search": "Men's K1",
+      "bibs": [1, 80]
+    },
+    {
+      "code": "C1M",
+      "search": "Men's C1",
+      "bibs": [1, 80]
+    },
+    {
+      "code": "K1W",
+      "search": "Women's K1",
+      "bibs": [1, 80]
+    },
+    {
+      "code": "C1W",
+      "search": "Women's C1",
+      "bibs": [1, 80]
+    }
+  ],
+  "rankings": "2026-1",
+  "dobOverrides": [
+    {
+      "lastName": "Songberg",
+      "dob": "01/01/1955"
+    }
+  ],
+  "nameRemaps": [
+    {
+      "from": "O'CALLAGHAN Georgie",
+      "to": "O'CALLAGHAN Georgia"
+    }
+  ]
+}

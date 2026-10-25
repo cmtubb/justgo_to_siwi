@@ -262,7 +262,9 @@ export function convert(input: ConvertInput): ConvertResult {
       siwi.push(entry);
     }
 
-    if (matchedValues.size > 1) {
+    if (matchedValues.size === 0) {
+      warnings.push(`Class ${ev.code} (search '${ev.search}') matched no entrants.`);
+    } else if (matchedValues.size > 1) {
       warnings.push(
         `Search '${ev.search}' (class ${ev.code}) matched ${matchedValues.size} different ` +
           `values: ${quoteList(matchedValues)}. If that's not intended, make it more ` +

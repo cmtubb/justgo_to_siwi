@@ -12,7 +12,10 @@ served as a static site (e.g. GitHub Pages) with no backend.
 
 Once deployed to GitHub Pages, open the published URL and follow the steps:
 
-1. **Upload attendee CSV** — the JustGo export.
+1. **Upload attendee CSV** — the JustGo export. Optionally load a **race
+   config** saved from an earlier run (or one from `configs/`) to fill in every
+   step below. Anything that doesn't fit this CSV, like a column it doesn't
+   have, is left out with a warning.
 2. **Map columns** — match the `Classes`, `Age`, `Club` and (optionally)
    `Gender` fields to the CSV's column headers. Mapping `Club` to the
    `Organisation` column enables the same club-acronym guessing as the Python
@@ -29,10 +32,14 @@ Once deployed to GitHub Pages, open the published URL and follow the steps:
    Values no class picks up stay in the Summary only. Warnings flag searches
    that match several different values, values matched by several classes, and
    values no class picked up.
-4. **Rankings (optional)** — pick a built-in ICF world ranking release to seed
+4. **Athlete fixes (optional)** — force a DOB by surname, or change the name
+   used for a paddler's ranking lookup.
+5. **Rankings (optional)** — pick a built-in ICF world ranking release to seed
    bibs by ranking, or leave it on "None" to order bibs by age only.
-5. **Generate** — preview the results and download `for_siwi_*.csv` and
-   `race_info_*.xlsx`.
+6. **Generate** — preview the results and download `for_siwi_*.csv` and
+   `race_info_*.xlsx`. **Save config** downloads every setting (including the
+   output name) as a race config, to load next time or to run with
+   `justgo_to_siwi_convert.py`.
 
 ## Local development
 
@@ -53,6 +60,13 @@ suite (`src/lib/convert.test.ts`) runs the converter against the committed
 example CSV and asserts the output is **identical** to what the Python script
 produces (`src/lib/__fixtures__/expected_nationals_for_siwi.csv`), so the two
 implementations stay in sync.
+
+`src/lib/config.ts` reads and writes the race config files that
+`justgo_to_siwi_convert.py` also uses. Its tests (`src/lib/config.test.ts`)
+run every example in `../examples/` through its config in `../configs/` and
+compare with `../examples/expected/` — the same files the Python tests check —
+and confirm that loading then saving each committed config reproduces it
+exactly.
 
 ## Deployment
 

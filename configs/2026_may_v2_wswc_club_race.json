@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "outputName": "2026_may_v2_wswc_club_race",
+  "columns": [
+    {
+      "field": "Age",
+      "columns": [
+        "Age on Event Start Date"
+      ]
+    },
+    {
+      "field": "Classes",
+      "columns": [
+        "Slalom Entry  - Club:Class"
+      ]
+    },
+    {
+      "field": "Club",
+      "columns": [
+        "Organisation"
+      ]
+    }
+  ],
+  "classes": [
+    {
+      "code": "K1M",
+      "search": "MK1",
+      "bibs": [1, 80]
+    },
+    {
+      "code": "C1M",
+      "search": "MC1",
+      "bibs": [1, 80]
+    },
+    {
+      "code": "K1W",
+      "search": "WK1",
+      "bibs": [1, 80]
+    },
+    {
+      "code": "C1W",
+      "search": "WC1",
+      "bibs": [1, 80]
+    }
+  ],
+  "rankings": "2026-1",
+  "dobOverrides": [
+    {
+      "lastName": "Songberg",
+      "dob": "01/01/1955"
+    }
+  ],
+  "nameRemaps": [
+    {
+      "from": "O'CALLAGHAN Georgie",
+      "to": "O'CALLAGHAN Georgia"
+    }
+  ]
+}

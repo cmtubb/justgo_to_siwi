@@ -15,21 +15,26 @@ Scripts for converting Australian canoe slalom event registrations from [JustGo]
 
 ```
 events/
-├── examples/              # Sample JustGo CSVs for testing (--example mode)
+├── justgo_to_siwi_convert.py  # Command-line converter: race config + attendee CSV
+├── configs/               # Race configs (JSON), shared by the web app and the CLI
+├── examples/              # Sample JustGo CSVs, and expected/ outputs for the tests
 ├── data/                  # Event-specific input data (gitignored)
 ├── src/
-│   ├── justgo_to_siwi/    # Core conversion library
-│   ├── races/             # Per-event conversion scripts
+│   ├── justgo_to_siwi/    # Core conversion library and config loading
 │   └── tools/             # Utilities (ranking fetcher, filename helper)
+├── tests/                 # Python tests
 ├── web/                   # Browser version of the converter (no install needed)
-│   └── public/rankings/   # ICF ranking releases (JSON), shared by the web app and race scripts
+│   └── public/rankings/   # ICF ranking releases (JSON), shared by the web app and the CLI
 └── pyproject.toml
 ```
 
 ## Two ways to use it
 
 - **[Web app](web/)** (`web/`) — a static, browser-based version of the converter for non-technical users. No install, nothing is uploaded (all processing happens locally in the browser), and it can be hosted on GitHub Pages. See [`web/README.md`](web/README.md).
-- **Python scripts** (`src/`) — the original CLI workflow, and the only way to run the ICF rankings scraper. Documented below.
+- **Python command line** (`justgo_to_siwi_convert.py`) — the same conversion, driven by a race config file, and the only way to run the ICF rankings scraper. Documented below.
+
+Both use the same **race config** files (`configs/*.json`), so a config saved
+from the web app can be run from the command line and vice versa.
 
 ## Setup
 
@@ -58,7 +63,7 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 Or run commands through uv without activating:
 
 ```bash
-uv run python src/races/convert_2026_nationals.py --example
+uv run ./justgo_to_siwi_convert.py configs/2026_nationals.json examples/example_nationals.csv
 ```
 
 `get_icf_rankings.py` talks to Siwi over plain HTTP, so it needs no browser or
@@ -79,8 +84,8 @@ python src/tools/get_icf_rankings.py
 Releases that Siwi lists but hasn't published results for yet are skipped, so
 re-running mid-year simply picks up each new release as it appears.
 
-Both the web app and the race scripts read these same JSON files — point your
-event script at the release you want (see `rankings=` in the race scripts).
+Both the web app and the command line read these same JSON files — a race
+config picks a release by id (`"rankings": "2026-2"`).
 
 ### 2. Prepare event data
 
@@ -92,26 +97,31 @@ Some JustGo exports have spaces in the filename — `src/tools/clean_filename.sh
 ./src/tools/clean_filename.sh "Attendees My Event.csv"
 ```
 
-### 3. Run a conversion script
+### 3. Run the converter
 
-Each event has a script under `src/races/`. Several support `--example` to run against the files in `examples/` without real event data:
+Give it a race config and the attendee CSV:
 
 ```bash
-# Nationals example
-python src/races/convert_2026_nationals.py --example
-
-# Age nationals example
-python src/races/convert_2025_age_nationals.py --example
-
-# NSW State Champs example (one column per class)
-python src/races/convert_2026_nsw_state_champs.py --example
+./justgo_to_siwi_convert.py configs/2026_nationals.json data/2026_Nationals/Attendees.csv
 ```
 
-For a real event, run the script without `--example` after placing the CSV in the expected `data/` subdirectory (paths are configured in each script).
+To try it on the example files without real event data (`--name` sets the
+output name, `--out-dir` where the files go):
+
+```bash
+./justgo_to_siwi_convert.py configs/2026_nationals.json examples/example_nationals.csv --name nationals_example
+./justgo_to_siwi_convert.py configs/2026_age_nationals.json examples/example_age_nationals.csv --name age_nationals_example
+./justgo_to_siwi_convert.py configs/2026_nsw_state_champs.json examples/example_state_champs.csv --name state_champs_example
+```
+
+If the config doesn't fit the CSV — a column it names isn't there, or its
+ranking release doesn't exist — the converter stops and lists every problem
+(with "did you mean …" suggestions), rather than producing a partial result.
+Other issues, like a class that matches no entrants, are printed as warnings.
 
 ### 4. Outputs
 
-Scripts write two timestamped files into the data directory:
+The converter writes two timestamped files next to the CSV (or into `--out-dir`):
 
 | File | Description |
 |------|-------------|
@@ -122,35 +132,73 @@ These output files are also gitignored.
 
 ## Adding a new event
 
-Create a new script in `src/races/` following an existing one. You need to configure:
+The easiest way is to set the event up in the [web app](web/) with its
+attendee CSV, then **Save config** and commit the file to `configs/`. Or copy
+an existing config and edit it. A config looks like:
 
-- **`columns`** — maps internal field names to JustGo CSV column headers. For exports with one column per class, map `Classes` to a list of headers; their non-empty values are joined with `|`
-- **`events`** — maps Siwi class codes to `(search_string, (bib_start, bib_end))` tuples; the search string is a regex tested against each `|`-separated value of the classes column (so `^C1` won't match `MC1`). An optional third item takes options:
-  - `{"male": "MCSLX", "female": "WCSLX"}` — split the class by a mapped `Gender` column; anyone else keeps the class code. Give a split its own bib range with `("MCSLX", (101, 180))`
-  - `{"bibs": False}` — include the class in the Siwi output but leave its Bib blank
-
-  Class values that no event matches (e.g. teams events) are left out of the Siwi output but still appear in the Summary.
-- **`summary_only`** (optional) — mapped fields to keep in the Summary but leave out of the Siwi output, e.g. `["Gender", "C2Partner"]`
-- **`datadir` / `infile`** — where the input CSV lives
-- **`rankings`** — path to an ICF ranking release JSON file (see `web/public/rankings/`)
-
-Then instantiate `JustGoToSiwi` and call `calculate()`:
-
-```python
-from justgo_to_siwi import JustGoToSiwi
-
-jgs = JustGoToSiwi(datadir, infile, out_ident, events, columns, rankings)
-df, df_r, df_siwi = jgs.calculate()
+```json
+{
+  "version": 1,
+  "outputName": "2026_nsw_state_champs",
+  "columns": [
+    { "field": "Age", "columns": ["Age on Event Start Date"] },
+    { "field": "Classes", "columns": ["NSW State Champs 2025 - Club:MK1", "NSW State Champs 2025 - Club:MC1"] },
+    { "field": "Club", "columns": ["Organisation"] },
+    { "field": "C2Partner", "columns": ["NSW State Champs 2025 - Club:C2 partner"], "siwi": false }
+  ],
+  "classes": [
+    { "code": "K1M", "search": "^MK1$", "bibs": [1, 80] },
+    { "code": "CSLX", "search": "^CSLX", "bibs": [1, 80],
+      "male": { "code": "MCSLX", "bibs": [101, 180] },
+      "female": { "code": "WCSLX", "bibs": [201, 280] } },
+    { "code": "C2", "search": "^C2", "bibs": null }
+  ],
+  "rankings": "2026-2",
+  "dobOverrides": [{ "lastName": "Smith", "dob": "01/01/1955" }],
+  "nameRemaps": [{ "from": "SMITH Jo", "to": "SMITH Joanne" }]
+}
 ```
 
-`calculate()` prints warnings (also kept in `jgs.warnings`) for searches that match several different class values, values matched by several classes, values no class picked up, and classes with no ranking data.
+- **`outputName`** — names the output files (`--name` overrides it).
+- **`columns`** — maps each field to one or more CSV column headers, in output
+  order. `Classes` is required; give it several columns for exports with one
+  column per class (their non-empty values are joined with `|`). `Age` breaks
+  ranking ties; `Club` mapped to `Organisation` gets club acronyms guessed;
+  `Gender` is needed for male/female class codes. `"siwi": false` keeps a field
+  in the Summary only.
+- **`classes`** — one per Siwi class. `search` is a regex tested against each
+  `|`-separated Classes value (so `^C1` won't match `MC1`). `bibs` is the
+  `[start, end]` range, or `null` to include the class with blank bibs.
+  Optional `male` / `female` codes split the class by `Gender`, each with its
+  own `bibs` (defaulting to the class's range); anyone else keeps the class
+  code. Class values no class matches (e.g. teams events) stay in the Summary
+  only.
+- **`rankings`** — the ICF ranking release id from `web/public/rankings/`, or
+  `null` for none.
+- **`dobOverrides`** — force a DOB for everyone with a given surname.
+- **`nameRemaps`** — change a `SURNAME First` name before the ranking lookup.
 
-## Existing race scripts
+The converter prints warnings for searches that match several different class
+values, values matched by several classes, values no class picked up, classes
+that match no entrants, and classes with no ranking data.
 
-| Script | Event |
+## Race configs
+
+| Config | Event |
 |--------|-------|
-| `convert_2026_nationals.py` | 2026 Canoe Slalom Nationals |
-| `convert_2025_age_nationals.py` | 2026 Age Nationals (rescheduled) |
-| `convert_2026_may_wswc_club_race.py` | WS Whitewater Club race (May 2026) |
-| `convert_2026_may_v2_wswc_club_race.py` | WS Whitewater Club race v2 (May 2026) |
-| `convert_2026_nsw_state_champs.py` | NSW State Champs (one column per class) |
+| `2026_nationals.json` | 2026 Canoe Slalom Nationals |
+| `2026_age_nationals.json` | 2026 Age Nationals (rescheduled) |
+| `2026_may_wswc_club_race.json` | WS Whitewater Club race (May 2026) |
+| `2026_may_v2_wswc_club_race.json` | WS Whitewater Club race v2 (May 2026) |
+| `2026_nsw_state_champs.json` | NSW State Champs (one column per class) |
+
+## Tests
+
+```bash
+uv sync                 # or: pip install pytest
+python -m pytest
+```
+
+The tests run each example CSV through its race config and compare the result
+with `examples/expected/`. The web app's tests check the same files, so both
+converters stay in step.
