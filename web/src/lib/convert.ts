@@ -140,12 +140,6 @@ function lookupRanking(
   return found ? String(found.ranking) : "";
 }
 
-/** Ordinal (code-point) string comparison, matching Python's default ordering. */
-function cmpStr(a: string, b: string): number {
-  if (a === b) return 0;
-  return a < b ? -1 : 1;
-}
-
 /**
  * Descending numeric comparison for Ranking. Python's Ranking column is read
  * back from Excel as int64 (pandas infers the numeric type), so it sorts
@@ -311,7 +305,17 @@ export function convert(input: ConvertInput): ConvertResult {
     );
   }
 
-  // Sort: Class descending, Ranking descending (numeric; unranked last),
+  // Classes come out in config order; a gender-split class lists its male,
+  // female, then catch-all code.
+  const classOrder = new Map<string, number>();
+  for (const ev of events) {
+    for (const gender of ["male", "female", null] as const) {
+      const code = classCode(ev, gender).code;
+      if (!classOrder.has(code)) classOrder.set(code, classOrder.size);
+    }
+  }
+
+  // Sort: Class in config order, Ranking descending (numeric; unranked first),
   // Age ascending; original order breaks ties for stability.
   const hasAge = internalNames.includes("Age");
   if (!hasAge) {
@@ -322,7 +326,7 @@ export function convert(input: ConvertInput): ConvertResult {
   }
   const indexed = siwi.map((r, i) => ({ r, i }));
   indexed.sort((a, b) => {
-    const byClass = cmpStr(b.r.Class, a.r.Class);
+    const byClass = classOrder.get(a.r.Class)! - classOrder.get(b.r.Class)!;
     if (byClass !== 0) return byClass;
     const byRanking = cmpRankingDesc(a.r.Ranking ?? "", b.r.Ranking ?? "");
     if (byRanking !== 0) return byRanking;

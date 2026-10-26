@@ -172,7 +172,8 @@ an existing config and edit it. A config looks like:
   Optional `male` / `female` codes split the class by `Gender`, each with its
   own `bibs` (defaulting to the class's range); anyone else keeps the class
   code. Class values no class matches (e.g. teams events) stay in the Summary
-  only.
+  only. The Siwi output lists classes in this order (a split class gives its
+  male, female, then catch-all code).
 - **`rankings`** — the ICF ranking release id from `web/public/rankings/`, or
   `null` for none.
 - **`dobOverrides`** — force a DOB for everyone with a given surname.

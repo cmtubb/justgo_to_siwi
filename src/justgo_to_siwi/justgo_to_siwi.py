@@ -166,6 +166,9 @@ class JustGoToSiwi():
         value_matches = {v: {} for values in class_values for v in values}
 
         class_df = []
+        # Output position of each Siwi class code: config order, with a gender-split
+        # class listing its male, female, then catch-all code
+        class_order = {}
         # Bib range for each Siwi class code (None: no bibs), first class to produce it wins
         bib_ranges = {}
         for cl, (search_name, bibs, *rest) in self.events.items():
@@ -174,6 +177,8 @@ class JustGoToSiwi():
             splits = {g: (s, bibs) if isinstance(s, str) else s
                       for g in ("male", "female") if (s := options.get(g))}
             no_bibs = options.get("bibs") is False
+            for code in [s for s, _ in splits.values()] + [cl]:
+                class_order.setdefault(code, len(class_order))
 
             hits = class_values.apply(lambda values: [v for v in values if re.search(search_name, v)])
             matched = list(dict.fromkeys(v for vs in hits for v in vs))
@@ -260,25 +265,26 @@ class JustGoToSiwi():
 
         df_siwi_ranking['Ranking'] = siwi_ranking
 
-        # Sort unranked entries before ranked ones (they get the highest
-        # bibs), then ranked entries by ranking value descending; Age breaks
-        # ties in both groups. Sorting on explicit `_is_ranked`/`_ranking_value`
-        # columns avoids mixing int and "" in one column, which pandas
-        # compares unpredictably.
+        # Sort classes in config order. Within a class, unranked entries come
+        # before ranked ones (they get the highest bibs), then ranked entries
+        # by ranking value descending; Age breaks ties in both groups. Sorting
+        # on explicit `_is_ranked`/`_ranking_value` columns avoids mixing int
+        # and "" in one column, which pandas compares unpredictably.
+        df_siwi_ranking['_class_order'] = df_siwi_ranking['Class'].map(class_order)
         df_siwi_ranking['_is_ranked'] = siwi_is_ranked
         df_siwi_ranking['_ranking_value'] = siwi_ranking_value
         has_age = "Age" in df_siwi_ranking.columns
         if not has_age:
             self.warn("No 'Age' column mapped: entries with the same ranking (or no ranking at "
                       "all) will keep the CSV's original row order instead of being ordered by age.")
-        sort_by = ['Class', '_is_ranked', '_ranking_value'] + (['Age'] if has_age else [])
+        sort_by = ['_class_order', '_is_ranked', '_ranking_value'] + (['Age'] if has_age else [])
         df_siwi_ranking = df_siwi_ranking.sort_values(
             sort_by,
-            ascending=[False, True, False, True][:len(sort_by)],
+            ascending=[True, True, False, True][:len(sort_by)],
             kind="stable",
         )
         df_siwi_ranking = df_siwi_ranking.drop(
-            columns=(['Age'] if has_age else []) + ['_is_ranked', '_ranking_value'])
+            columns=(['Age'] if has_age else []) + ['_class_order', '_is_ranked', '_ranking_value'])
         df_siwi_ranking.reset_index(drop=True, inplace=True)
 
         df_siwi_ranking["Bib"] = 0
